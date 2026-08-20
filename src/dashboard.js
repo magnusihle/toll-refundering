@@ -29,7 +29,7 @@ export function dashboardData() {
     lines: (linesByToll.get(x.tollnummer) || []).sort((a, b) => (a.item_number || 0) - (b.item_number || 0)),
   }));
   const goods = [];
-  for (const dec of declarations) for (const l of dec.lines) goods.push({ tollnummer: dec.tollnummer, godkjent: dec.godkjent, aktor: dec.aktor, ...l });
+  for (const dec of declarations) for (const l of dec.lines) goods.push({ tollnummer: dec.tollnummer, godkjent: dec.godkjent, godkjent_iso: dec.godkjent_iso, aktor: dec.aktor, ...l });
 
   const win = claimWindow();
   const meta = {
