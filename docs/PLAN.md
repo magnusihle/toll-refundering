@@ -33,12 +33,15 @@ rører dem ikke. Det er verifisert, og det er derfor planen er trygg.
 
 ## Arbeidsstrøm A — én vareidentitet
 
-**A1. Felles normalisering, backend.** Ny `src/identity.js` med én eksportert
-`normalizeProductText(desc)`: fjern ledende artikkelnummer-prefiks (`^\d[\d ,.]*`),
-fjern pakningsstørrelser (`\d+ (g|gr|kg|ml|l|stk|mg|kaps?|tabl)\b`), senk/strippt
-tegnsetting, kollaps whitespace. Unit-tester på reelle eksempler:
-rødkløver-variantene → samme nøkkel; «22983 Rødkløver kap 400 mg» → EGEN nøkkel
-(kapsler er en annen vare). *Liten. Ingen avhengigheter.*
+**A1. Felles normalisering, backend — GJORT 2026-08-20.** Ny `src/identity.js`
+med `normalizeProductText(desc)`. Unit-tester (`test/identity.test.js`) på reelle
+`desc:`-verdier fra `data/emma.db`: alle fire rødkløverblomst-variantene
+(«4618,100 Rødkløverblomst 100 g», «4618 Rødkløverblomst 1 kg», «Rødkløverblomst
+100 g», «RØDKLØVERBLOMST») → samme nøkkel `rødkløverblomst`; «22983 Rødkløver
+kap.400 mg 120 stk» → egen nøkkel `rødkløver kap` (kapsler skilt fra blomst).
+Ikke koblet inn i `productKey` ennå — det er A2. Port: 19/19 tester grønt,
+`tsc`+`build` grønt, `totalLikely`/`count` uendret (71862.12 / 257 — uberørt,
+filen brukes ikke av noe kjørende kodeveis ennå).
 
 **A2. Bruk den i `productKey` + re-nøkle DB.** `desc:`-grenen i
 `productKey` går via A1 (behold `art:`-grenen urørt). Nytt script
