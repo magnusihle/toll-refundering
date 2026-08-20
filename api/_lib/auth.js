@@ -5,7 +5,7 @@ import { pool } from './pool.js';
 // Better Auth for the Vercel deployment. Google sign-in ONLY, restricted to a
 // single email domain (default declaro.no). Users/sessions live in Vercel
 // Postgres / Neon (the serverless functions can't use the app's local SQLite).
-const ALLOWED_DOMAIN = (process.env.ALLOWED_EMAIL_DOMAIN || 'declaro.no').toLowerCase();
+const ALLOWED_DOMAIN = (process.env.ALLOWED_EMAIL_DOMAIN || 'declaro.no').trim().toLowerCase().replace(/^@+/, '');
 const baseURL = process.env.BETTER_AUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
 export const auth = betterAuth({
@@ -29,8 +29,11 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
-          const email = String(user.email || '').toLowerCase();
-          if (!email.endsWith('@' + ALLOWED_DOMAIN)) {
+          const email = String(user?.email || '').trim().toLowerCase();
+          const ok = !!email && email.endsWith('@' + ALLOWED_DOMAIN);
+          // Visible in Vercel runtime logs — the authoritative diagnostic.
+          console.log(`[domain-gate] email="${email}" allowed="@${ALLOWED_DOMAIN}" -> ${ok ? 'ALLOW' : 'REJECT'}`);
+          if (!ok) {
             throw new APIError('FORBIDDEN', { message: `Kun @${ALLOWED_DOMAIN}-kontoer har tilgang.` });
           }
           return { data: user };
