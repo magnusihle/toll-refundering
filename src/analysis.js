@@ -91,6 +91,15 @@ export function preferenceOpportunities({ win = claimWindow() } = {}) {
       AND (gl.preference_code IS NULL OR gl.preference_code IN ('N','J'))
   `).all();
   const chapter = (hs) => parseInt(String(hs).slice(0, 2), 10);
+  // Agent-dommene gjelder en GRUPPE (HS|beskrivelse|opphav), og `realistisk_belop` er beløpet for
+  // HELE gruppen — ikke per linje. Summer derfor betalt toll per gruppe først, så hver linje kan få
+  // sin forholdsmessige andel. Uten dette ville en dom på 20 083 kr blitt lagt på alle gruppens
+  // 5 linjer = 100 415 kr.
+  const groupPaid = new Map();
+  for (const r of rows) {
+    const k = prefKey(r.hs_code, r.description, r.origin);
+    groupPaid.set(k, (groupPaid.get(k) || 0) + (r.tl_amount || 0));
+  }
   const all = rows.map((r) => {
     const dl = claimDeadline(r.godkjent_iso, win);
     // VIKTIG skille: EØS-preferanse eliminerer toll fullt ut bare for EKTE industrivarer
@@ -125,28 +134,65 @@ export function preferenceOpportunities({ win = claimWindow() } = {}) {
         }
       }
     }
+    // AGENT-DOM på agri-linjer uten innvilget nedsettelse. Uten dom var disse bare stemplet
+    // «til gjennomgang» med HELE den betalte tollen som beløp — et tak som blåste opp totalen.
+    // Dommen gir vurdert sannsynlighet + realistisk beløp (som regel 0, eller differansen mot
+    // riktig varenummer ved feilklassifisering). Ikke-vurderte grupper skilles ut som «unassessed»
+    // så de ikke telles som krav.
+    let verdict = null, verdictShare = null;
+    if (tier === 'review') {
+      const v = prefVerdictFor(r.hs_code, r.description, r.origin);
+      if (v) {
+        verdict = v;
+        tier = TIER_BY_LIKELIHOOD[v.likelihood] || 'review';
+        // Fordel gruppens beløp forholdsmessig etter betalt toll på linjen.
+        const paid = groupPaid.get(prefKey(r.hs_code, r.description, r.origin)) || 0;
+        const share = paid > 0 ? (r.tl_amount || 0) / paid : 0;
+        verdictShare = round2((v.realistisk_belop || 0) * share);
+      } else tier = 'unassessed';
+    }
     return {
       ...r,
-      agri, grant,
+      agri, grant, verdict,
       tier,
-      recoverable: grant ? grant.over : round2(r.tl_amount),   // grant: realistisk overbetaling; ellers øvre tak
+      // grant: realistisk overbetaling · verdict: agentens realistiske beløp · ellers øvre tak
+      recoverable: grant ? grant.over : verdict ? verdictShare : round2(r.tl_amount),
       claim_deadline: dl.deadline, days_left: dl.daysLeft,
       // 3-årsfristen løper fra fortollingsdatoen, så eldre linjer er tapt selv om de ligger i basen
       claimable: r.godkjent_iso ? (r.godkjent_iso >= win.from && !dl.expired) : null,
     };
   }).filter((r) => r.tier !== 'weak').sort((a, b) => b.recoverable - a.recoverable);
-  const expiredItems = all.filter((r) => r.claimable === false);
-  const items = all.filter((r) => r.claimable !== false)
+  // Agenten konkluderte med at tollen er korrekt betalt -> ikke et krav. Holdes utenfor
+  // items (og dermed utenfor totalen), men rapporteres så arbeidet er synlig og etterprøvbart.
+  const dismissed = all.filter((r) => r.tier === 'no_basis');
+  // Ennå ikke agent-vurdert: vises som eget, ærlig merket restparti - ikke som lovet gjenvinning.
+  const unassessed = all.filter((r) => r.tier === 'unassessed');
+  const expiredItems = all.filter((r) => r.claimable === false && r.tier !== 'no_basis' && r.tier !== 'unassessed');
+  const items = all.filter((r) => r.claimable !== false && r.tier !== 'no_basis' && r.tier !== 'unassessed')
     .map((r) => ({
       ...r, kind: 'preferanse',
       matched_product: r.grant ? r.grant.product : null,
       skrivnummer: r.grant ? r.grant.skriv : null,
-      summary: r.grant
+      likelihood: r.verdict ? r.verdict.likelihood : null,
+      reasoning: r.verdict ? r.verdict.begrunnelse : null,
+      claim_draft: r.verdict ? r.verdict.krav_utkast : null,
+      mekanisme: r.verdict ? r.verdict.mekanisme : null,
+      summary: r.verdict
+        ? `${r.aktor || 'Aktør'} betalte ${krn(r.tl_amount)} toll for «${(r.description || '').trim()}» (HS ${r.hs_code}) fra ${r.origin}. `
+          + `Agent-vurdering: ${r.verdict.begrunnelse} `
+          + (r.verdict.foreslatt_hs ? `Foreslått riktig varenummer: ${r.verdict.foreslatt_hs}${r.verdict.foreslatt_sats != null ? ` (${r.verdict.foreslatt_sats} kr/kg)` : ''}${r.verdict.verifisert_sats ? ', sats verifisert i tolltariffen' : ', sats IKKE verifisert'}. ` : '')
+          + `Realistisk krav ≈ ${krn(r.recoverable)} (ikke hele den betalte tollen).`
+        : r.grant
         ? `«${(r.description || '').trim()}» (HS ${r.hs_code}) ble fortollet ${r.godkjent} til ${r.tl_rate} kr/kg, men produktet har en INNVILGET RÅK-nedsettelse (${(r.grant.skriv[0] || '—')}) på ${r.grant.entitled} kr/kg (gyldig ${r.grant.fom} – ${r.grant.tom}, landgruppe ${r.grant.landgruppe || '—'}). Tollen ble bokført som TL, ikke RT — nedsettelsen ble ikke brukt. Est. overbetaling ≈ ${krn(r.grant.over)}.`
         : r.agri
         ? `${r.aktor || 'Aktør'} betalte ${krn(r.tl_amount)} toll for landbruksvaren «${(r.description || '').trim()}» (HS ${r.hs_code}) fra ${r.origin}. EØS gir IKKE automatisk tollfritak for landbruks-/RÅK-varer — tollen reduseres bare via RÅK-tollnedsettelse eller den lavere avtalesatsen, som må verifiseres per vare. Beløpet er et øvre tak, ikke bekreftet gjenvinnbart.`
         : `${r.aktor || 'Aktør'} betalte ${krn(r.tl_amount)} ordinær toll for industrivaren «${(r.description || '').trim()}» (HS ${r.hs_code}) fra ${r.origin}. ${r.origin} er preferanseberettiget, men preferanse «${r.preference_code}» ble ikke krevd ved fortolling.`,
-      action: r.grant
+      action: r.verdict
+        ? (r.verdict.krav_utkast || `Be DSV vurdere omberegning. Est. ${krn(r.recoverable)}.`)
+          + ` Frist: ${r.claim_deadline || '3 år'}${r.days_left != null ? ` (${r.days_left} dager igjen)` : ''}.`
+          + (r.verdict.mekanisme === 'feilklassifisering' ? ` Krever omtariffering — legg ved produktspesifikasjon/innholdsdeklarasjon som dokumenterer varens art.` : '')
+          + (r.verdict.verifisert_sats === false ? ` NB: satsen er ikke verifisert mot tolltariffen — bekreft før kravet sendes.` : '')
+        : r.grant
         ? `Be DSV om omberegning i TVINN og oppgi skrivnummer ${(r.grant.skriv[0] || '—')} (gyldig ${r.grant.fom} – ${r.grant.tom}). Est. refusjon ≈ ${krn(r.grant.over)}. Frist: ${r.claim_deadline || '3 år'}${r.days_left != null ? ` (${r.days_left} dager igjen)` : ''}. Produktmatch agent-verifisert (samme produkt).`
           + `${r.grant.landgruppe === 'TOES' && !r.origin_proof ? ` KREVER opprinnelsesbevis (EØS-nedsettelse, landgruppe TOES): innhent fakturaerklæring/REX fra leverandøren — ligger ikke på deklarasjonen i dag.` : ''}`
           + ` MERK: tollen er bokført som TL (ikke RT) — få DSV til å bekrefte at nedsettelsen gjelder denne tollposten.`
@@ -159,6 +205,17 @@ export function preferenceOpportunities({ win = claimWindow() } = {}) {
   const totalRecoverable = round2(items.reduce((s, r) => s + (r.recoverable || 0), 0));
   return {
     window: win, count: items.length, totalRecoverable, items,
+    // Agent-vurdert, men uten reelt grunnlag: tas ut av kravene (var tidligere med i «potensialet»).
+    dismissed: {
+      count: dismissed.length,
+      ceiling: round2(dismissed.reduce((s, r) => s + (r.tl_amount || 0), 0)),
+      items: dismissed.map((r) => ({ tollnummer: r.tollnummer, aktor: r.aktor, produkt: (r.description || '').trim(), hs_code: r.hs_code, origin: r.origin, betalt_toll: round2(r.tl_amount), begrunnelse: r.verdict?.begrunnelse })),
+    },
+    // Ennå ikke agent-vurdert (restpartiet av småbeløp).
+    unassessed: {
+      count: unassessed.length,
+      ceiling: round2(unassessed.reduce((s, r) => s + (r.tl_amount || 0), 0)),
+    },
     expiredCount: expiredItems.length,
     expiredAmount: round2(expiredItems.reduce((s, r) => s + (r.recoverable || 0), 0)),
     expiredItems,
@@ -178,9 +235,21 @@ export function productInconsistencies() {
     FROM goods_lines gl JOIN declarations dcl ON dcl.tollnummer=gl.tollnummer
     WHERE gl.product_key IS NOT NULL
   `).all();
+  // Grupperingsnøkkel. Riktig MVA-sats og riktig varenummer er egenskaper ved VAREN, ikke ved
+  // pakningsstørrelsen eller hvem som solgte den. Tidligere nøkkel (aktør + eksakt beskrivelse)
+  // splittet «NDS Probiotic Classic», «... 100 g» og «... 200 g» i tre produkter hos hver sin
+  // leverandør — da ble en tydelig 4-mot-1-avviker redusert til et uavgjort «2 linjer, 15/25 %».
+  // Vi stripper derfor pakningsstørrelse/antall og grupperer på tvers av leverandør.
+  const packRe = /\b\d+[\d.,]*\s*(?:g|gr|gram|kg|ml|cl|l|liter|stk|kaps(?:ler)?|caps(?:ules)?|tabl(?:etter)?|tabs?|pcs|mg)\b\.?/gi;
+  const normProduct = (l) => {
+    const base = l.article_number ? 'art:' + String(l.article_number).trim().toLowerCase()
+      : (l.description || l.product_key || '').toLowerCase();
+    return base.replace(packRe, ' ').replace(/[^a-z0-9æøå]+/g, ' ').trim().replace(/\s+/g, ' ');
+  };
   const groups = new Map();
   for (const l of lines) {
-    const key = (l.aktor || '?') + '||' + l.product_key;
+    const key = normProduct(l);
+    if (!key) continue;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(l);
   }
@@ -199,25 +268,46 @@ export function productInconsistencies() {
     if (vat.length > 1) issues.push('vat');
     // «Ulik preferansekode» fjernet: preferanse varierer legitimt per sending.
     if (!issues.length) continue;
-    // estimate VAT overpay: lines above the min VAT rate
-    let vatOverpay = 0;
+    // MVA-avvik: bruk FLERTALLSSATSEN som referanse, ikke laveste. Med 4 linjer på 15 % og
+    // 1 på 25 % er det den ene som er avvikeren — det gir en langt tydeligere konklusjon enn
+    // «laveste observerte sats», som lot en enslig feil sette fasiten.
+    let vatOverpay = 0, vatMajority = null, vatOutliers = [];
     if (vat.length > 1) {
-      const minR = Math.min(...vat);
-      for (const l of g) if (l.vat_rate != null && l.vat_rate > minR && l.vat_base != null) vatOverpay += l.vat_base * (l.vat_rate - minR) / 100;
+      const tally = new Map();
+      for (const l of g) if (l.vat_rate != null) tally.set(l.vat_rate, (tally.get(l.vat_rate) || 0) + 1);
+      vatMajority = [...tally.entries()].sort((a, b) => (b[1] - a[1]) || (a[0] - b[0]))[0][0];
+      for (const l of g) if (l.vat_rate != null && l.vat_rate > vatMajority && l.vat_base != null) {
+        vatOverpay += l.vat_base * (l.vat_rate - vatMajority) / 100;
+        vatOutliers.push({ tollnummer: l.tollnummer, godkjent: l.godkjent, vat_rate: l.vat_rate });
+      }
     }
+    const aktorer = [...new Set(g.map((x) => x.aktor).filter(Boolean))];
     flags.push({
-      aktor: g[0].aktor, product_key: key.split('||')[1],
+      aktor: aktorer.length > 1 ? aktorer.join(' / ') : (g[0].aktor || null),
+      aktorer, product_key: key,
       description: g[0].description, lines: g.length, issues,
       hs_codes: hs, vat_rates: vat, preferences: pref,
-      est_vat_overpay: round2(vatOverpay),
+      // VIKTIG: innførsels-MVA er FRADRAGSBERETTIGET inngående avgift for en mva-registrert
+      // importør — for høy sats betales og fradragsføres i samme oppgave, så netto kontanteffekt
+      // er null. Dette er derfor et KVALITETSAVVIK, ikke penger å hente. Beløpet beholdes som
+      // `vat_discrepancy` for innsyn, men `est_vat_overpay` (som går inn i kravsummene) er 0.
+      // (Forutsetter full fradragsrett; ved delvis avgiftsunntatt virksomhet er beløpet reelt.)
+      est_vat_overpay: 0,
+      vat_discrepancy: round2(vatOverpay),
+      vat_majority: vatMajority, vat_outliers: vatOutliers,
+      cash_impact: false,
       members: g.map((x) => ({ tollnummer: x.tollnummer, godkjent: x.godkjent, hs_code: x.hs_code, origin: x.origin, preference_code: x.preference_code, vat_rate: x.vat_rate, description: x.description, article_number: x.article_number })),
       tollnummers: [...new Set(g.map((x) => x.tollnummer))],
       kind: 'produkt',
-      summary: `Produktet «${(g[0].description || '').trim()}» hos ${g[0].aktor || 'aktør'} er behandlet ulikt på tvers av ${g.length} linjer: ${issues.map((i) => i === 'hs' ? 'ulik HS-kode innen samme posisjon (' + hs.join('/') + ')' : 'ulik MVA-sats (' + vat.join('/') + '%)').join('; ')}.`,
-      action: `Avklar korrekt ${issues.join(' og ')} med DSV og bruk konsekvent verdi fremover. ${issues.includes('vat') ? 'Der for høy MVA-sats er brukt: vurder omberegning (est. ' + krn(vatOverpay) + '). ' : ''}${issues.includes('hs') ? 'Ulik HS betyr at minst én klassifisering kan være feil — feil HS kan gi feil toll/RÅK. ' : ''}Riktig, konsekvent deklarering hindrer nye avvik.`,
+      summary: `Produktet «${(g[0].description || '').trim()}»${aktorer.length > 1 ? ` (${aktorer.length} leverandører)` : ` hos ${g[0].aktor || 'aktør'}`} er deklarert ulikt på tvers av ${g.length} linjer: `
+        + issues.map((i) => i === 'hs'
+          ? `ulik HS-kode innen samme posisjon (${hs.join('/')})`
+          : `ulik MVA-sats — ${vatOutliers.length} av ${g.length} linjer bruker ${vatOutliers.map((o) => o.vat_rate).join('/')} %, resten ${vatMajority} %`).join('; ')
+        + `.${issues.includes('vat') ? ` MVA-differansen er ca. ${krn(vatOverpay)}, men innførsels-MVA er fradragsberettiget — netto kontanteffekt er null. Dette er et deklareringsavvik, ikke et refusjonskrav.` : ''}`,
+      action: `${issues.includes('vat') ? `Be DSV bruke ${vatMajority} % konsekvent for denne varen og rette rutinen — ikke send refusjonskrav på MVA-en; den er allerede fradragsført. ` : ''}${issues.includes('hs') ? 'Ulik HS betyr at minst én klassifisering kan være feil — feil HS kan gi feil toll/RÅK. Avklar riktig varenummer med DSV. ' : ''}Konsekvent deklarering hindrer nye avvik.`,
     });
   }
-  flags.sort((a, b) => (b.est_vat_overpay - a.est_vat_overpay) || (b.lines - a.lines));
+  flags.sort((a, b) => ((b.vat_discrepancy || 0) - (a.vat_discrepancy || 0)) || (b.lines - a.lines));
   return { count: flags.length, items: flags };
 }
 
@@ -317,6 +407,24 @@ function raakVerdicts() {
   return RAAK_VERDICTS;
 }
 const verdictFor = (description, prod) => raakVerdicts()[(description || '').trim() + '||' + (prod || '').trim()] || null;
+
+// Agent-vurderte PREFERANSE-linjer (data/pref-verdicts.json). Nøkkel: «HS|BESKRIVELSE|OPPRINNELSE».
+// Disse gjelder agri-linjer som ellers bare ble stemplet «til gjennomgang»: agenten har slått opp
+// faktisk tollsats i tolltariffen og avgjort om det finnes en reell, tilbakevirkende refusjonsvei
+// (typisk feilklassifisering). Dommen erstatter både tier OG beløp — «ingen» fjerner kravet helt,
+// slik at taket ikke lenger blåses opp av linjer vi selv mener ikke er gjenvinnbare.
+let PREF_VERDICTS = null;
+function prefVerdicts() {
+  if (PREF_VERDICTS) return PREF_VERDICTS;
+  try { PREF_VERDICTS = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'pref-verdicts.json'), 'utf8')).verdicts || {}; }
+  catch { PREF_VERDICTS = {}; }
+  return PREF_VERDICTS;
+}
+export const prefKey = (hs, description, origin) =>
+  [String(hs ?? ''), (description || '').trim().toUpperCase(), (origin || '').toUpperCase()].join('|');
+const prefVerdictFor = (hs, description, origin) => prefVerdicts()[prefKey(hs, description, origin)] || null;
+// Agentens sannsynlighet -> tier brukt i UI/vekting.
+const TIER_BY_LIKELIHOOD = { 'høy': 'reclass_strong', middels: 'reclass_possible', lav: 'reclass_weak', ingen: 'no_basis' };
 
 // Beste produktgruppe for en varelinje (token-overlapp innen samme varenummer).
 // STRENGT: en match krever minst ett DISTINKTIVT (ikke-generisk) fellesord. Deler
@@ -470,15 +578,27 @@ export function raakReconciliation({ win = claimWindow() } = {}) {
 // written summary and a concrete next step, for review/export and handoff to DSV.
 export function actionList(pref, raak, prod) {
   const rows = [];
-  for (const r of pref.items) rows.push({ kind: 'Preferanse', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action });
+  for (const r of pref.items) rows.push({ kind: 'Preferanse', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, likelihood: r.likelihood, reasoning: r.reasoning, claim_draft: r.claim_draft, mekanisme: r.mekanisme });
   for (const r of raak.items) rows.push({ kind: 'RÅK', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.confidence, amount_nok: r.est_overpay, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action });
   for (const r of prod.items) rows.push({ kind: 'Produkt', tollnummer: (r.tollnummers || [])[0], godkjent: null, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: 'info', amount_nok: r.est_vat_overpay, frist: null, dager_igjen: null, summary: r.summary, action: r.action });
   rows.sort((a, b) => (b.amount_nok || 0) - (a.amount_nok || 0));
   const totalStrong = round2(rows.filter((r) => r.confidence === 'strong' || r.tier === 'strong').reduce((s, r) => s + (r.amount_nok || 0), 0));
+  // ÉN kilde for vektingen (frontend speiler denne i web/src/lib/recovery.ts).
+  // Agentens sannsynlighet går foran match-styrken når den finnes.
+  const weightOf = (r) => r.likelihood
+    ? ({ 'høy': 0.8, middels: 0.4, lav: 0.1, ingen: 0 })[r.likelihood] ?? 0.3
+    : ({ strong: 0.8, raak_grant: 0.35, possible: 0.35, weak: 0.2, review: 0.1, info: 0.55 })[r.confidence] ?? 0.4;
+  // «Sannsynlig» er hovedtallet vi kommuniserer; «tak» er summen av beløpene og skal
+  // alltid vises som tak, aldri som forventet utbetaling.
+  const totalLikely = round2(rows.reduce((s, r) => s + (r.amount_nok || 0) * weightOf(r), 0));
+  // Solid = agent-bekreftet høy sannsynlighet eller sterk, verifisert match.
+  const totalSolid = round2(rows.filter((r) => r.likelihood === 'høy' || (!r.likelihood && r.confidence === 'strong')).reduce((s, r) => s + (r.amount_nok || 0), 0));
   // Hastesaker: krav som foreldes innen 90 dager
   const urgent = rows.filter((r) => r.dager_igjen != null && r.dager_igjen <= 90).sort((a, b) => a.dager_igjen - b.dager_igjen);
   return {
     count: rows.length, totalPotential: round2(rows.reduce((s, r) => s + (r.amount_nok || 0), 0)), totalStrong,
+    totalLikely, totalSolid,
+    assessed: rows.filter((r) => r.likelihood).length,
     urgentCount: urgent.length, urgentAmount: round2(urgent.reduce((s, r) => s + (r.amount_nok || 0), 0)),
     expired: {
       preference: { count: pref.expiredCount || 0, amount: pref.expiredAmount || 0 },

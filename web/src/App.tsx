@@ -50,15 +50,35 @@ function Shell({ data, onDone }: { data: any; onDone: () => void }) {
         <div className="flex items-center gap-2"><CurrencySelect />{!HOSTED && <RefreshButton onDone={onDone} />}{HOSTED && <UserMenu />}</div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Kpi label="Deklarasjoner">{m.declarations}</Kpi>
         <Kpi label="Varelinjer">{m.goodsLines}</Kpi>
         <Kpi label="Verdi (NOK-basis)"><Money nok={m.valueNok} /></Kpi>
         <Kpi label="MVA-grunnlag 25%"><Money nok={m.mva25} /></Kpi>
-        <Kpi label={'Potensiell gjenvinning' + (recKind !== 'alle' ? ' · ' + recKind : '')}><span className="text-success"><Money nok={recAgg.total} /></span></Kpi>
-        <Kpi label={'Sannsynlig (vektet)' + (recKind !== 'alle' ? ' · ' + recKind : '')}><Money nok={recAgg.likely} /></Kpi>
-        <Kpi label={'Haster ≤90 d' + (recKind !== 'alle' ? ' · ' + recKind : '')}><span className={recAgg.urgentCount ? 'text-destructive' : ''}>{recAgg.urgentCount}</span></Kpi>
       </div>
+
+      {/* Gjenvinning: «sannsynlig» er hovedtallet vi kommuniserer. Taket vises bevisst
+          nedtonet og eksplisitt merket, så det aldri leses som en lovet utbetaling. */}
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Kpi label={'Sannsynlig gjenvinning' + (recKind !== 'alle' ? ' · ' + recKind : '')}>
+          <span className="text-success"><Money nok={recAgg.likely} /></span>
+        </Kpi>
+        <Kpi label={'Solid grunnlag' + (recKind !== 'alle' ? ' · ' + recKind : '')}>
+          <Money nok={recAgg.solid} />
+        </Kpi>
+        <Kpi label={'Øvre tak — ikke et krav' + (recKind !== 'alle' ? ' · ' + recKind : '')}>
+          <span className="text-muted-foreground"><Money nok={recAgg.ceiling} /></span>
+        </Kpi>
+        <Kpi label={'Haster ≤90 d' + (recKind !== 'alle' ? ' · ' + recKind : '')}>
+          <span className={recAgg.urgentCount ? 'text-destructive' : ''}>{recAgg.urgentCount}</span>
+        </Kpi>
+      </div>
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        <b>Sannsynlig gjenvinning</b> = hvert krav vektet med vurdert sannsynlighet — dette er tallet å planlegge etter.
+        <b> Øvre tak</b> er summen av all toll som er berørt av kravene, og forutsetter at absolutt alt går igjennom; det skjer ikke.
+        {ins.actions.assessed > 0 && <> Av {ins.actions.count} krav er <b>{ins.actions.assessed}</b> vurdert av agent mot faktiske satser i tolltariffen.</>}
+      </p>
 
       {(ins.coverage?.byYear?.length ?? 0) > 0 && (
         <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
