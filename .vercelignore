@@ -1,15 +1,11 @@
-# Vercel needs only web/ (built) + api/ (functions) + package.json + snapshot.
-# Everything below is local-only (collection, MCP server, tests, docs, data).
-src/
-src/modules/
-src/sad/
-vendor/
-docs/
-test/
-scripts/
-.session/
-data/
+# Local-only paths not needed by the Vercel build (web/ + api/ + package.json).
+# Leading slash anchors each to the repo ROOT — WITHOUT it, `src/` would also match
+# web/src/ and delete the frontend source (breaks the build).
+/src/
+/vendor/
+/docs/
+/test/
+/scripts/
+/.session/
+/data/
 *.log
-backfill.log
-full-run.log
-serve.log
