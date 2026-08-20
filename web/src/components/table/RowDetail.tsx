@@ -185,7 +185,11 @@ export const COL = {
  * so every expansion that bottoms out in declarations ends the same way, and you can
  * always reach the SAD you need to document a claim.
  */
-export function entryColumns(middle: SourceColumn[], opts: { deadline?: Get; sad?: Get } = {}): SourceColumn[] {
-  const { deadline = (r: any) => r.days_left, sad = (r: any) => r.sad_url } = opts;
-  return [COL.tollnummer(), COL.godkjent(), ...middle, COL.frist(deadline), COL.kilde(sad)];
+export function entryColumns(middle: SourceColumn[], opts: { godkjent?: Get; deadline?: Get; sad?: Get } = {}): SourceColumn[] {
+  const {
+    godkjent = (r: any) => r.godkjent,
+    deadline = (r: any) => r.days_left,
+    sad = (r: any) => r.sad_url,
+  } = opts;
+  return [COL.tollnummer(), COL.godkjent(godkjent), ...middle, COL.frist(deadline), COL.kilde(sad)];
 }

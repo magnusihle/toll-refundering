@@ -298,6 +298,7 @@ export function Recovery() {
                     COL.plain('Opphav', (r: any) => r.origin),
                     COL.money('Betalt toll', (r: any) => r.betalt_toll),
                   ], {
+                    godkjent: (r: any) => entries.get(r.tollnummer)?.godkjent,
                     deadline: (r: any) => entries.get(r.tollnummer)?.days_left,
                     sad: (r: any) => entries.get(r.tollnummer)?.sad_url,
                   }),
