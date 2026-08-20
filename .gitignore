@@ -13,3 +13,5 @@ data/fx-cache.json
 .DS_Store
 .vercel/
 api/_data/auth-schema.sql
+.vercel
+.env*

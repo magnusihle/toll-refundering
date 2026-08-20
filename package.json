@@ -12,7 +12,7 @@
     "dump": "node src/cli.js dump",
     "query": "node src/cli.js query",
     "serve": "node src/cli.js serve",
-    "auth:migrate": "npx @better-auth/cli@latest migrate --config api/_lib/auth.js -y",
+    "auth:migrate": "node scripts/auth-migrate.mjs",
     "publish": "node src/cli.js publish"
   },
   "dependencies": {
