@@ -1,13 +1,11 @@
 import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
-import pg from 'pg';
+import { pool } from './pool.js';
 
 // Better Auth for the Vercel deployment. Google sign-in ONLY, restricted to a
 // single email domain (default declaro.no). Users/sessions live in Vercel
 // Postgres / Neon (the serverless functions can't use the app's local SQLite).
 const ALLOWED_DOMAIN = (process.env.ALLOWED_EMAIL_DOMAIN || 'declaro.no').toLowerCase();
-const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || '';
-const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
 const baseURL = process.env.BETTER_AUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined);
 
 export const auth = betterAuth({
@@ -15,10 +13,7 @@ export const auth = betterAuth({
   baseURL,
   secret: process.env.BETTER_AUTH_SECRET,
   trustedOrigins: [baseURL, process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`].filter(Boolean),
-  database: new pg.Pool({
-    connectionString,
-    ssl: isLocal ? false : { rejectUnauthorized: false }, // Neon/Vercel Postgres require TLS
-  }),
+  database: pool,
   emailAndPassword: { enabled: false },
   socialProviders: {
     google: {

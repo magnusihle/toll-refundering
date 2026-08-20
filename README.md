@@ -49,7 +49,7 @@ node src/cli.js serve                   # dashboard på http://127.0.0.1:8899
 node src/cli.js serve [port]     # kjør dashboardet lokalt (med live Refresh)
 node src/cli.js build [from to]  # inkrementell innsamling (default: hele 3-årsvinduet)
 node src/cli.js insights         # skriv gjenvinningsanalysen som JSON
-node src/cli.js snapshot         # skriv api/_data/snapshot.js for Vercel-deploy
+node src/cli.js publish          # push lokal data → prod-DB (Neon/Vercel Postgres)
 node src/cli.js window           # vis 3-årsfristen (Europe/Oslo)
 node src/cli.js login|dump|fields  # smoke-test / selektor-tuning
 ```
@@ -60,14 +60,14 @@ nytt. 3-årsvinduet regnes i norsk tid per kjøring.
 ## Deploy til Vercel (autentisert dashboard)
 
 Dashboardet kan hostes på Vercel bak **Google-innlogging begrenset til @declaro.no**
-(Better Auth + Vercel Postgres). Playwright-innsamlingen kan ikke kjøre serverless,
-så den deployede appen leser et **snapshot** (`api/_data/snapshot.js`) som genereres
-lokalt. Full oppskrift: **[DEPLOY.md](DEPLOY.md)**.
+(Better Auth + Vercel Postgres). Playwright-innsamlingen kan ikke kjøre serverless, så
+den kjøres lokalt og dataene **publiseres til prod-databasen** — den deployede appen
+leser live derfra, uten ny deploy per dataoppdatering. Full oppskrift:
+**[DEPLOY.md](DEPLOY.md)**.
 
 ```bash
-node src/cli.js build      # oppdater data lokalt
-npm run snapshot           # skriv snapshot som deployes
-vercel --prod
+node src/cli.js build      # inkrementell innsamling til lokal SQLite (ingen re-scrape)
+npm run publish            # push lokal data → prod-DB (Neon/Vercel Postgres)
 ```
 
 ## Prosjektstruktur
@@ -77,8 +77,7 @@ src/            innsamling, analyse, lokal server, MCP-server (src/server.js)
   sad/          SAD-PDF → JSON (box47 toll + per-linje MVA)
   modules/      EMMA-grid + Linjer + SAD-fetch
 api/            Vercel serverless-funksjoner (auth, data, status)
-  _lib/         Better Auth-instans, FX, session-guard
-  _data/        generert snapshot
+  _lib/         Better Auth + delt Postgres-pool, FX, snapshot-leser, session-guard
 web/            React-dashboard (Vite + shadcn/ui)
 data/           SQLite-base + RÅK-register (lokalt, gitignorert)
 docs/           datamodell + utviklingshistorikk

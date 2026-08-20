@@ -11,9 +11,9 @@
     "login-test": "node src/cli.js login",
     "dump": "node src/cli.js dump",
     "query": "node src/cli.js query",
-    "snapshot": "node src/cli.js snapshot",
     "serve": "node src/cli.js serve",
-    "auth:migrate": "npx @better-auth/cli@latest migrate --config api/_lib/auth.js -y"
+    "auth:migrate": "npx @better-auth/cli@latest migrate --config api/_lib/auth.js -y",
+    "publish": "node src/cli.js publish"
   },
   "dependencies": {
     "better-auth": "^1.7.1",

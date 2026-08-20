@@ -2,8 +2,9 @@
 
 Vercel hoster **dashboardet** (statisk frontend + `/api/*` serverless-funksjoner) bak
 Google-innlogging begrenset til **@declaro.no**. Datainnsamlingen (Playwright-innlogging
-mot emmaedoc.no) kan **ikke** kjøre serverless — den kjøres lokalt og produserer et
-snapshot som deployes.
+mot emmaedoc.no) kan **ikke** kjøre serverless — den kjøres lokalt, og dataene
+**publiseres til prod-databasen** (Neon/Vercel Postgres) med `npm run publish`. Den
+deployede appen leser live fra databasen, så oppdatering av data krever ingen ny deploy.
 
 ## Arkitektur
 
@@ -11,9 +12,9 @@ snapshot som deployes.
 |-----|--------|-----|
 | Frontend (React/Vite) | Vercel static | `web/` → `web/dist` |
 | Auth (Better Auth, Google) | Vercel function | `api/auth/[...all].js`, `api/_lib/auth.js` |
-| `/api/data`, `/api/status` | Vercel function (session-gated) | `api/data.js`, `api/status.js` |
-| Data-snapshot | generert **lokalt**, committes/deployes | `api/_data/snapshot.js` |
-| Innsamling (Playwright) | **kun lokalt** | `node src/cli.js build` |
+| `/api/data`, `/api/status` | Vercel function (session-gated, leser Postgres) | `api/data.js`, `api/status.js` |
+| Data i prod | `dashboard_snapshot`-rad i Postgres, pushet med `publish` | `src/pgsync.js` |
+| Innsamling (Playwright) → lokal SQLite | **kun lokalt** | `node src/cli.js build` |
 
 ## 1. Vercel Postgres / Neon
 
@@ -41,32 +42,33 @@ declaro.no-organisasjonen. Domenegrensen håndheves uansett server-side.)
 | `ALLOWED_EMAIL_DOMAIN` | `declaro.no` (default hvis utelatt) |
 | `VITE_HOSTED` | `1` — skrur på auth-gate + skjuler lokal Refresh-knapp (build-time) |
 
-## 4. Opprett auth-tabellene (én gang)
+## 4. Opprett tabellene
 
-Med `DATABASE_URL` satt lokalt (i `.env` eller shell):
-
+**Auth-tabeller** (én gang) — med `DATABASE_URL` satt lokalt:
 ```bash
 DATABASE_URL="postgres://…" npm run auth:migrate
 ```
+**Data-tabellen** (`dashboard_snapshot`) opprettes automatisk første gang du kjører
+`npm run publish` (se steg 5) — ingen egen migrering nødvendig.
 
-Dette lager Better Auth-tabellene (`user`, `session`, `account`, `verification`) i Postgres.
+## 5. Publiser data og deploy
 
-## 5. Generer snapshot og deploy
-
+Første gang:
 ```bash
-# 1) samle inn / oppdater data lokalt (Playwright)
-node src/cli.js build
-
-# 2) skriv snapshot som deployes (api/_data/snapshot.js)
-npm run snapshot
-
-# 3) deploy
-vercel --prod        # eller push til main hvis Git-integrasjon er koblet
+vercel --prod                       # deploy frontend + funksjoner (koden)
 ```
+Deretter, hver gang du vil oppdatere dataene i prod:
+```bash
+node src/cli.js build               # inkrementell innsamling til lokal SQLite (henter
+                                    # kun deklarasjoner som IKKE allerede ligger i basen)
+DATABASE_URL="postgres://…" npm run publish   # push lokal data → prod-DB (ingen re-scrape)
+```
+`publish` beregner dashboard-payloaden fra den lokale basen og upserter den til
+`dashboard_snapshot`-raden i Postgres. **Ingen ny `vercel`-deploy trengs** for å
+oppdatere data — det deployede dashboardet leser raden live og auto-oppdaterer åpne
+faner innen ~15 s. Ny `vercel --prod` trengs kun når du endrer selve koden.
 
-**Oppdatere data senere:** kjør `node src/cli.js build` → `npm run snapshot` →
-`vercel --prod` (eller commit + push). Dashboardet på Vercel er et statisk øyeblikksbilde
-mellom hver slik oppdatering; «Refresh»-knappen vises kun i lokal modus (`cli.js serve`).
+> `DATABASE_URL` må være satt lokalt for `publish` (legg den i `.env`, som er gitignorert).
 
 ## Lokalt (uendret)
 

@@ -82,12 +82,21 @@ function Shell({ data, onDone }: { data: any; onDone: () => void }) {
 
 function Dashboard() {
   const [data, setData] = React.useState<any>(null);
-  const countRef = React.useRef(-1);
-  const load = React.useCallback(async () => { const d = await getData(); setData(d); countRef.current = d.meta.declarations; }, []);
+  const load = React.useCallback(async () => { setData(await getData()); }, []);
   React.useEffect(() => { load(); }, [load]);
   React.useEffect(() => {
-    if (HOSTED) return; // hosted snapshot is static — nothing to poll for
-    const id = setInterval(async () => { try { const s = await getStatus(); if (s?.db && s.db.declarations !== countRef.current) load(); } catch {} }, 6000);
+    // Reload when the data changes: hosted → on a new `publish` (updatedAt),
+    // local → when the collection grows (declarations). `last` inits on first tick.
+    let last = '';
+    const tick = async () => {
+      try {
+        const s = await getStatus();
+        const stamp = String(s?.updatedAt ?? s?.db?.declarations ?? '');
+        if (last && stamp && stamp !== last) load();
+        last = stamp;
+      } catch {}
+    };
+    const id = setInterval(tick, HOSTED ? 15000 : 6000);
     return () => clearInterval(id);
   }, [load]);
   if (!data) return <div className="mx-auto max-w-[1400px] space-y-3 p-5"><Skeleton className="h-10 w-80" /><Skeleton className="h-24 w-full" /><Skeleton className="h-96 w-full" /></div>;
