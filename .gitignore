@@ -1,0 +1,15 @@
+node_modules/
+.env
+.session/
+data/*.csv
+data/*.json
+*.log
+data/sad/
+data/emma.db*
+dashboard/index.html
+web/node_modules/
+web/dist/
+data/fx-cache.json
+.DS_Store
+.vercel/
+api/_data/auth-schema.sql

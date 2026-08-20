@@ -1,0 +1,33 @@
+{
+  "name": "emma-edoc-agent",
+  "version": "0.1.0",
+  "description": "Headless MCP server that logs into EMMA EDOC (emmaedoc.no), maps its fields, and extracts/analyses customs-declaration data.",
+  "type": "module",
+  "bin": {
+    "emma-edoc-agent": "src/server.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "login-test": "node src/cli.js login",
+    "dump": "node src/cli.js dump",
+    "query": "node src/cli.js query",
+    "snapshot": "node src/cli.js snapshot",
+    "serve": "node src/cli.js serve",
+    "auth:migrate": "npx @better-auth/cli@latest migrate --config api/_lib/auth.js -y"
+  },
+  "dependencies": {
+    "better-auth": "^1.7.1",
+    "csv-stringify": "^6.5.1",
+    "dotenv": "^16.4.5",
+    "pg": "^8.23.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "playwright": "^1.47.0",
+    "tsx": "^4.23.12"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

@@ -1,0 +1,15 @@
+# Vercel needs only web/ (built) + api/ (functions) + package.json + snapshot.
+# Everything below is local-only (collection, MCP server, tests, docs, data).
+src/
+src/modules/
+src/sad/
+vendor/
+docs/
+test/
+scripts/
+.session/
+data/
+*.log
+backfill.log
+full-run.log
+serve.log
