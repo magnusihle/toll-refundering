@@ -32,7 +32,7 @@ export const auth = betterAuth({
           const email = String(user?.email || '').trim().toLowerCase();
           const ok = !!email && email.endsWith('@' + ALLOWED_DOMAIN);
           // Visible in Vercel runtime logs — the authoritative diagnostic.
-          console.log(`[domain-gate] email="${email}" allowed="@${ALLOWED_DOMAIN}" -> ${ok ? 'ALLOW' : 'REJECT'}`);
+          console.error(`[domain-gate] email="${email}" allowed="@${ALLOWED_DOMAIN}" -> ${ok ? 'ALLOW' : 'REJECT'}`);
           if (!ok) {
             throw new APIError('FORBIDDEN', { message: `Kun @${ALLOWED_DOMAIN}-kontoer har tilgang.` });
           }

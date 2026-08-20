@@ -16,8 +16,10 @@ CREATE TABLE IF NOT EXISTS dashboard_snapshot (
 );`;
 
 export async function publish({ onProgress = (m) => process.stderr.write(m + '\n') } = {}) {
-  const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-  if (!connectionString) throw new Error('Mangler DATABASE_URL. Sett den i .env (samme Neon/Vercel Postgres som Better Auth).');
+  const raw = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!raw) throw new Error('Mangler DATABASE_URL. Sett den i .env (samme Neon/Vercel Postgres som Better Auth).');
+  let connectionString = raw;
+  try { const u = new URL(raw); u.searchParams.delete('sslmode'); u.searchParams.delete('channel_binding'); connectionString = u.toString(); } catch {}
   const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
   const client = new pg.Client({ connectionString, ssl: isLocal ? false : { rejectUnauthorized: false } });
   await client.connect();
