@@ -29,6 +29,12 @@ Playwright (login emmaedoc.no) ─▶ SQLite (data/emma.db) ─▶ analyse ─�
   box47-avgifter (`src/sad/`), og lagrer i SQLite. Kun lokalt.
 - **Analyse** (`src/analysis.js`): datovalid RÅK-avstemming (`src/raak.js`,
   `src/period.js`) + preferanse + produkt → `insights()`.
+- **BKU-presedens** (`src/bku.js`): når agenten foreslår et annet varenummer,
+  hentes tolletatens egne klassifiseringsuttalelser for BÅDE foreslått og
+  deklarert kode fra `data/bku-rulings.json` (8 969 uttalelser, lokal ressurs —
+  `data/` er gitignored; mangler den, degraderer analysen stille til ingen
+  presedens). Modulen feller ingen dom: den viser hva myndigheten HAR plassert
+  under hver kode og lar leseren vurdere. Presedens, ikke vedtak.
 - **Dashboard** (`web/`, React + Vite + shadcn/ui + react-router): sidebar-navigasjon
   med egne ruter — `/` dashbord · `/gjenvinning` · `/avgifter` · `/varer` ·
   `/deklarasjoner` · `/leverandorer`. Filtre ligger i URL-en (`?type=`, `?frist=haster`,

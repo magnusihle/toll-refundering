@@ -54,7 +54,7 @@ export type ClaimGroup = {
   assessed: number;
   tollnummers: string[];
   /** Felt som er identiske for hele gruppen, og derfor kan løftes ut av radlisten. */
-  shared: { action?: string; reasoning?: string; claim_draft?: string; likelihood?: string };
+  shared: { action?: string; reasoning?: string; claim_draft?: string; likelihood?: string; bku?: any };
   _flag: boolean;
 };
 
@@ -97,6 +97,9 @@ export function groupClaims(rows: any[]): ClaimGroup[] {
         reasoning: sharedVal(claims, 'reasoning'),
         claim_draft: sharedVal(claims, 'claim_draft'),
         likelihood: sharedVal(claims, 'likelihood'),
+        // Presedensen henger på (vare, varenummer) — identisk for hele gruppen,
+        // så den kan løftes ut sammen med de andre delte feltene.
+        bku: claims.find((r) => r.bku)?.bku,
       },
       _flag: days.some((d) => d <= 90),
     });

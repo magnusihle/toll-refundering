@@ -54,6 +54,7 @@ import path from 'node:path';
 import { getDb } from './db.js';
 import { ROOT } from './config.js';
 import { claimWindow, claimDeadline } from './period.js';
+import { bkuEvidence } from './bku.js';
 import { standardRateOn, landgrupperFor, nedsettelser } from './raak.js';
 
 // Duty-type code → category (from customs-hs-matcher toll-data/codes/box47-duty-type).
@@ -177,6 +178,12 @@ export function preferenceOpportunities({ win = claimWindow() } = {}) {
       reasoning: r.verdict ? r.verdict.begrunnelse : null,
       claim_draft: r.verdict ? r.verdict.krav_utkast : null,
       mekanisme: r.verdict ? r.verdict.mekanisme : null,
+      // Presedens fra tolletatens egne klassifiseringsuttalelser, når agenten
+      // faktisk har foreslått et annet varenummer. Ingen dom — bare hva
+      // myndigheten HAR plassert under hver av de to kodene.
+      bku: r.verdict && r.verdict.foreslatt_hs
+        ? bkuEvidence({ description: r.description, declaredCode: r.hs_code, proposedCode: r.verdict.foreslatt_hs, perCode: 3 })
+        : null,
       summary: r.verdict
         ? `${r.aktor || 'Aktør'} betalte ${krn(r.tl_amount)} toll for «${(r.description || '').trim()}» (HS ${r.hs_code}) fra ${r.origin}. `
           + `Agent-vurdering: ${r.verdict.begrunnelse} `
@@ -578,7 +585,7 @@ export function raakReconciliation({ win = claimWindow() } = {}) {
 // written summary and a concrete next step, for review/export and handoff to DSV.
 export function actionList(pref, raak, prod) {
   const rows = [];
-  for (const r of pref.items) rows.push({ kind: 'Preferanse', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, likelihood: r.likelihood, reasoning: r.reasoning, claim_draft: r.claim_draft, mekanisme: r.mekanisme });
+  for (const r of pref.items) rows.push({ kind: 'Preferanse', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, likelihood: r.likelihood, reasoning: r.reasoning, claim_draft: r.claim_draft, mekanisme: r.mekanisme, bku: r.bku });
   for (const r of raak.items) rows.push({ kind: 'RÅK', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.confidence, amount_nok: r.est_overpay, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action });
   for (const r of prod.items) rows.push({ kind: 'Produkt', tollnummer: (r.tollnummers || [])[0], godkjent: null, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: 'info', amount_nok: r.est_vat_overpay, frist: null, dager_igjen: null, summary: r.summary, action: r.action });
   rows.sort((a, b) => (b.amount_nok || 0) - (a.amount_nok || 0));

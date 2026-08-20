@@ -125,11 +125,47 @@ export function Recovery() {
 
   // Samme strimler i begge visningene — og samme strimmel-språk som avvikene på
   // Varer- og Leverandør-sidene: en merkelapp, eventuelle verdier, og teksten under.
+  // Tolletatens egne klassifiseringsuttalelser under de to kodene. Vi påstår ikke
+  // hvem som vinner — en uttalelse om lindeblomst-te er presedens for tørket
+  // rødkløverblomst, ikke et vedtak om den. Leseren ser begge sider og dømmer.
+  const bkuBody = (bku: any) => (
+    <span className="block space-y-1.5">
+      {(['proposed', 'declared'] as const).map((side) => {
+        const list = bku?.[side] ?? [];
+        if (!list.length) return null;
+        return (
+          <span key={side} className="block">
+            <span className="text-xs font-medium text-foreground">
+              {side === 'proposed' ? 'Foreslått' : 'Deklarert'} {list[0].code}
+            </span>
+            {' — '}
+            {list.map((e: any, i: number) => (
+              <React.Fragment key={e.id}>
+                {i > 0 ? ' · ' : null}
+                <a href={e.link} target="_blank" rel="noopener" onClick={(ev) => ev.stopPropagation()}
+                   className="text-primary hover:underline" title={`${e.id} · ${e.publishDate ?? ''} · ${e.description}`}>
+                  {e.itemType || e.id}
+                </a>
+                {e.binding ? null : <span className="text-[10px] uppercase"> (CO)</span>}
+              </React.Fragment>
+            ))}
+          </span>
+        );
+      })}
+      <span className="block text-xs">
+        Uttalelsene gjelder varene de er avgitt for — presedens for denne varen, ikke et vedtak om den.
+      </span>
+    </span>
+  );
+
   const claimStrips = (r: any, opts: { scope?: string } = {}): DetailStrip[] => [
     ...(r.summary ? [{ label: 'Hva det er', tone: 'info', body: r.summary } as DetailStrip] : []),
     ...(r.action ? [{ label: 'Neste steg', tone: 'action', values: opts.scope ? [opts.scope] : undefined, body: r.action } as DetailStrip] : []),
     ...(r.reasoning ? [{ label: 'Agent-vurdering', tone: 'info', values: r.likelihood ? [`${r.likelihood} sannsynlighet`] : undefined, body: r.reasoning } as DetailStrip] : []),
     ...(r.claim_draft ? [{ label: 'Utkast til krav', tone: 'info', body: r.claim_draft } as DetailStrip] : []),
+    ...(r.bku && ((r.bku.proposed?.length ?? 0) + (r.bku.declared?.length ?? 0)) > 0
+      ? [{ label: 'BKU-presedens', tone: 'info', values: ['Tolletaten'], body: bkuBody(r.bku) } as DetailStrip]
+      : []),
   ];
 
   // Midtkolonnene i kravtabellen. Identiteten og sporet tilbake til fortollingen
