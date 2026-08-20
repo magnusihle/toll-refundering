@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Segmented } from '@/components/Segmented';
 import { Amount, Num } from '@/components/ui/metric';
 import { expandColumn, Primary, Secondary, Code, MoneyCell, CountCell, MultiValue, Deadline } from '@/components/table/cells';
-import { RowDetail, COL, entryColumns, type DetailNote, type DetailFinding } from '@/components/table/RowDetail';
+import { RowDetail, COL, entryColumns, type DetailStrip } from '@/components/table/RowDetail';
 import { useData, useEntryIndex } from '@/lib/data';
 import { n, plural } from '@/lib/format';
 import { TYPES, agg, rowsFor, groupClaims, type ClaimGroup } from '@/lib/recovery';
@@ -123,13 +123,13 @@ export function Recovery() {
       cell: (c: any) => c.getValue() ? <Badge variant={likVariant(c.getValue())}>{c.getValue()}</Badge> : <span className="text-muted-foreground">—</span> }] : []),
   ];
 
-  // Ett sett notater for begge visningene: samme rekkefølge, samme titler, enten
-  // teksten hører til én fortolling eller er felles for hele produktgruppen.
-  const claimNotes = (r: any, opts: { scope?: string } = {}): DetailNote[] => [
-    ...(r.summary ? [{ title: 'Hva det er', body: r.summary } as DetailNote] : []),
-    ...(r.action ? [{ title: opts.scope ? `Neste steg — ${opts.scope}` : 'Neste steg', tone: 'action', body: r.action } as DetailNote] : []),
-    ...(r.reasoning ? [{ title: `Agent-vurdering${r.likelihood ? ` — ${r.likelihood} sannsynlighet` : ''}`, body: r.reasoning } as DetailNote] : []),
-    ...(r.claim_draft ? [{ title: 'Utkast til krav', body: r.claim_draft } as DetailNote] : []),
+  // Samme strimler i begge visningene — og samme strimmel-språk som avvikene på
+  // Varer- og Leverandør-sidene: en merkelapp, eventuelle verdier, og teksten under.
+  const claimStrips = (r: any, opts: { scope?: string } = {}): DetailStrip[] => [
+    ...(r.summary ? [{ label: 'Hva det er', tone: 'info', body: r.summary } as DetailStrip] : []),
+    ...(r.action ? [{ label: 'Neste steg', tone: 'action', values: opts.scope ? [opts.scope] : undefined, body: r.action } as DetailStrip] : []),
+    ...(r.reasoning ? [{ label: 'Agent-vurdering', tone: 'info', values: r.likelihood ? [`${r.likelihood} sannsynlighet`] : undefined, body: r.reasoning } as DetailStrip] : []),
+    ...(r.claim_draft ? [{ label: 'Utkast til krav', tone: 'info', body: r.claim_draft } as DetailStrip] : []),
   ];
 
   // Midtkolonnene i kravtabellen. Identiteten og sporet tilbake til fortollingen
@@ -147,7 +147,7 @@ export function Recovery() {
     const r = row.original;
     return (
       <RowDetail
-        notes={claimNotes(r)}
+        strips={claimStrips(r)}
         source={{ caption: 'Fortollingen kravet gjelder', columns: claimSourceColumns, rows: [r],
           rowFlagged: (x: any) => x.dager_igjen != null && x.dager_igjen <= 90 }}
       />
@@ -158,7 +158,7 @@ export function Recovery() {
     const g = row.original as ClaimGroup;
     return (
       <RowDetail
-        notes={claimNotes(g.shared, { scope: g.count === 1 ? undefined : `gjelder alle ${g.count} fortollingene` })}
+        strips={claimStrips(g.shared, { scope: g.count === 1 ? undefined : `gjelder alle ${g.count} fortollingene` })}
         source={{
           caption: `${plural(g.tollnummers.length, 'fortolling', 'fortollinger')}${g.count !== g.tollnummers.length ? ` · ${g.count} kravlinjer` : ''} — hver fortolling må omberegnes for seg`,
           columns: claimSourceColumns,
@@ -290,7 +290,7 @@ export function Recovery() {
             getRowCanExpand={() => true}
             renderSubComponent={(row: any) => (
               <RowDetail
-                notes={[{ title: 'Agentens begrunnelse', body: row.original.begrunnelse || 'Ingen begrunnelse registrert.' }]}
+                strips={[{ label: 'Ikke grunnlag', tone: 'info', body: row.original.begrunnelse || 'Ingen begrunnelse registrert.' }]}
                 source={{
                   caption: 'Fortollingen vurderingen gjelder',
                   columns: entryColumns([
@@ -310,22 +310,22 @@ export function Recovery() {
             renderSubComponent={(row: any) => {
               const r = row.original;
               const reason = RAAK_REASON[r.status] ?? [r.status, 'merk'];
-              const findings: DetailFinding[] = [{
-                label: reason[0],
-                severity: reason[1] as DetailFinding['severity'],
-                values: [`vedtak gyldig ${r.granted_fom || '—'} – ${r.granted_tom || '—'}`],
-                note: <>Match i register: «{(r.matched_product || '').trim()}» ({r.confidence === 'strong' ? 'sterk' : 'svak'}) ·
-                  {' '}Standardsats på datoen: {r.standard_rate_status === 'gyldig'
-                    ? r.standard_rate + ' kr/kg'
-                    : 'ikke verifisert (satsuttrekket starter etter denne datoen)'}</>,
-              }];
+              const strips: DetailStrip[] = [
+                {
+                  label: reason[0],
+                  tone: reason[1] as DetailStrip['tone'],
+                  values: [`vedtak gyldig ${r.granted_fom || '—'} – ${r.granted_tom || '—'}`],
+                  body: <>Match i register: «{(r.matched_product || '').trim()}» ({r.confidence === 'strong' ? 'sterk' : 'svak'}) ·
+                    {' '}Standardsats på datoen: {r.standard_rate_status === 'gyldig'
+                      ? r.standard_rate + ' kr/kg'
+                      : 'ikke verifisert (satsuttrekket starter etter denne datoen)'}</>,
+                },
+                ...(r.summary ? [{ label: 'Hva det er', tone: 'info', body: r.summary } as DetailStrip] : []),
+                ...(r.action ? [{ label: 'Neste steg', tone: 'action', body: r.action } as DetailStrip] : []),
+              ];
               return (
                 <RowDetail
-                  findings={findings}
-                  notes={[
-                    ...(r.summary ? [{ title: 'Hva det er', body: r.summary } as DetailNote] : []),
-                    ...(r.action ? [{ title: 'Neste steg', tone: 'action', body: r.action } as DetailNote] : []),
-                  ]}
+                  strips={strips}
                   source={{
                     caption: 'Fortollingen kontrollen gjelder',
                     columns: entryColumns([
