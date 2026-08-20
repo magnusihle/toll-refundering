@@ -81,13 +81,15 @@ matcher tariffoverskrift-mønsteret får etikett «(tarifftekst)» og vis
 (målt: 332 025 kr deklarert som ikke er fordelt på type). Vises i dag ærlig som
 dekning-varsel — men burde tettes.
 
-**C1. Diagnose.** Velg 3 Linjer-deklarasjoner, hent SAD-en manuelt, avgjør om
-box 47-avgiftene finnes i kilden men tapes i ekstraksjonen, eller om Linjer-
-griden faktisk ikke bærer dem. *Liten, ren undersøkelse. Trenger EMMA-tilgang.*
+**C1. Diagnose — BESVART 2026-08-20** via `declarations.warnings`: av de 440
+Linjer-deklarasjonene har 161 allerede fått avgifter hentet fra SAD box 47
+(hybridveien finnes og virker), mens **278 står med «no box47/VAT»** — SAD-en
+ble aldri hentet for dem. Én deklarasjon fikk HTTP 500 i stedet for PDF.
 
-**C2. Implementer henting** (kun hvis C1 sier «finnes i kilden»): utvid
-ekstraksjonen og kjør inkrementell re-innsamling for de 440. *Middels. Avhenger
-av C1.*
+**C2. Kjør SAD-henting for de 278** (+ re-fetch av 500-eren). Mekanismen finnes
+allerede (samme vei som ga de 161); dette er en kjøring, ikke ny kode — men
+verifiser at inkrementell innsamling ikke hopper over deklarasjoner som allerede
+finnes. *Middels. Trenger EMMA-tilgang.*
 
 ## Arbeidsstrøm D — drift og tilgang
 
@@ -103,6 +105,26 @@ KPI-stabling, utvidede rader. *Manuell, 10 min.*
 toll) holdes utenfor totalene. Kjør agentvurderingen på nytt (samme prosess som
 ga pref-verdicts.json) og publiser. *Operatøroppgave — nye varer må
 agent-vurderes, heuristikken skal ikke gjette.*
+
+## Arbeidsstrøm F — prosesser og datavern (revisjon 2026-08-20)
+
+DB-kjernen er frisk: `integrity_check` ok, 0 FK-brudd, 0 foreldreløse rader,
+skriving skjer i transaksjon (`BEGIN/COMMIT/ROLLBACK` i `upsertDeclaration`),
+WAL + busy_timeout håndterer samtidig lesing. Prod-Postgres er ren: better-auth-
+tabeller + snapshot, kun @declaro.no-brukere. Restrisikoene:
+
+**F1. Versjoner agentdommene — GJORT 2026-08-20.** `pref-verdicts.json` og
+`raak-verdicts.json` fantes kun på én laptop (gitignored, ingen Time Machine).
+Whitelistet i .gitignore og committet. `emma.db` kan gjenoppbygges fra EMMA og
+`bku-rulings.json` fra customs-hs-matcher; dommene kunne ikke.
+
+**F2. Snapshot-historikk i prod.** `dashboard_snapshot` er én rad, siste skriver
+vinner — en publisering fra en korrupt lokal base overskriver god prod uten
+angremulighet. Behold de siste ~5 publiseringene (historikk-tabell eller
+løpenummer) med enkel rollback. *Liten.*
+
+**F3. Datarens (fold inn i A2-scriptet).** Én duplisert MV-charge
+(goods_line_id 3296), én varelinje uten description/product_key. *Triviell.*
 
 ## Arbeidsstrøm E — BKU-vedlikehold
 
@@ -121,7 +143,7 @@ A1 ──► A2 ──► A4 ─┐
 B1 (uavhengig)    │
 B2 (uavhengig)    │
 C1 ──► C2         │
-D1, D2, D3, E1 (uavhengige)
+D1, D2, D3, E1, F2 (uavhengige) · F3 → inn i A2
 ```
 
 Størst verdi per innsats: **A-strømmen** (retter det brukersynlige løftet «én

@@ -3,6 +3,10 @@ node_modules/
 .session/
 data/*.csv
 data/*.json
+# ...men agentdommene er uerstattelige (dyre agentkjøringer) og ikke hemmelige —
+# de SKAL versjoneres, ellers finnes de bare på én laptop.
+!data/pref-verdicts.json
+!data/raak-verdicts.json
 *.log
 data/sad/
 data/emma.db*
