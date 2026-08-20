@@ -1,11 +1,11 @@
 import { getSnapshot } from './_lib/snapshot.js';
 import { getRates } from './_lib/fx.js';
-import { requireSession } from './_lib/session.js';
-export default async function handler(request) {
-  const { session, res } = await requireSession(request);
-  if (!session) return res;
+import { getSession } from './_lib/session.js';
+export default async function handler(req, res) {
+  const session = await getSession(req);
+  if (!session) return res.status(401).json({ error: 'unauthenticated' });
   const snap = await getSnapshot();
-  if (!snap) return Response.json({ error: 'no data published yet — run `npm run publish` locally' }, { status: 503 });
+  if (!snap) return res.status(503).json({ error: 'no data published yet — run `npm run publish` locally' });
   const fx = await getRates();
-  return Response.json({ ...snap, meta: { ...snap.meta, fx } });
+  return res.status(200).json({ ...snap, meta: { ...snap.meta, fx } });
 }

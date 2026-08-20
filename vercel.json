@@ -4,6 +4,9 @@
   "installCommand": "npm install --omit=dev",
   "buildCommand": "cd web && npm install --include=dev && npm run build",
   "outputDirectory": "web/dist",
+  "rewrites": [
+    { "source": "/api/auth/:path*", "destination": "/api/authproxy" }
+  ],
   "functions": {
     "api/**/*.js": { "maxDuration": 15 }
   }
