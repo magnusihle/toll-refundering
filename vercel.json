@@ -5,9 +5,18 @@
   "buildCommand": "cd web && npm install --include=dev && npm run build",
   "outputDirectory": "web/dist",
   "rewrites": [
-    { "source": "/api/auth/:path*", "destination": "/api/authproxy" }
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/authproxy"
+    },
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ],
   "functions": {
-    "api/**/*.js": { "maxDuration": 15 }
+    "api/**/*.js": {
+      "maxDuration": 15
+    }
   }
 }

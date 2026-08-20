@@ -29,8 +29,10 @@ Playwright (login emmaedoc.no) ─▶ SQLite (data/emma.db) ─▶ analyse ─�
   box47-avgifter (`src/sad/`), og lagrer i SQLite. Kun lokalt.
 - **Analyse** (`src/analysis.js`): datovalid RÅK-avstemming (`src/raak.js`,
   `src/period.js`) + preferanse + produkt → `insights()`.
-- **Dashboard** (`web/`, React + Vite + shadcn/ui): Oversikt · Gjenvinning ·
-  Deklarasjoner · Varer.
+- **Dashboard** (`web/`, React + Vite + shadcn/ui + react-router): sidebar-navigasjon
+  med egne ruter — `/` dashbord · `/gjenvinning` · `/avgifter` · `/varer` ·
+  `/deklarasjoner` · `/leverandorer`. Filtre ligger i URL-en (`?type=`, `?frist=haster`,
+  `?kat=`), så toppkortene er ekte lenker inn i det filtrerte utvalget.
 
 ## Kom i gang (lokalt)
 

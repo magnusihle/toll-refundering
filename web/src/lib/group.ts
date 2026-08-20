@@ -1,7 +1,7 @@
 // Konsolidering av varelinjer.
 //
 // Én vare fra én leverandør får én varelinje PER SENDING. Uten konsolidering vises
-// «BioAcidophilus» fra Biocare 24 ganger i Varer-fanen, og et ekte avvik (én sending
+// «BioAcidophilus» fra Biocare 24 ganger i Varer-siden, og et ekte avvik (én sending
 // med 25 % MVA mot 23 med 15 %) drukner i repetisjonen. Vi grupperer derfor på
 // (aktør, product_key) — samme vareidentitet som produktavvikene i src/analysis.js —
 // og løfter ulikheter INNAD i gruppen opp som eksplisitte avvik.
@@ -11,12 +11,16 @@
 // gruppen på det avvikende feltet ville gjenskapt repetisjonen og skjult nettopp det vi
 // vil finne.
 
+import { rateUnit } from '@/lib/charges';
+
 export type Severity = 'avvik' | 'merk';
 export type Variance = { field: string; label: string; severity: Severity; values: any[]; note?: string };
 
 export type ChargeAgg = {
   key: string; source: string; charge_type: string;
   amount: number; base: number; rates: (number | null)[]; lines: number;
+  /** '%' | 'kr/kg' | … — utledet per linje, ikke gjettet ut fra avgiftstypen. */
+  unit: string;
 };
 
 export type GoodsGroup = {
@@ -164,8 +168,11 @@ function buildGroup(key: string, lines: any[]): GoodsGroup {
   for (const l of lines) for (const c of l.charges || []) {
     const k = c.source + ':' + c.charge_type;
     let a = cmap.get(k);
-    if (!a) { a = { key: k, source: c.source, charge_type: c.charge_type, amount: 0, base: 0, rates: [], lines: 0 }; cmap.set(k, a); }
+    if (!a) { a = { key: k, source: c.source, charge_type: c.charge_type, amount: 0, base: 0, rates: [], lines: 0, unit: '' }; cmap.set(k, a); }
     a.amount += num(c.amount); a.base += num(c.base); a.lines++;
+    // Enheten utledes fra den enkelte linjen (grunnlag × sats mot faktisk beløp) —
+    // aggregatet kan ikke brukes når gruppen har flere satser.
+    if (!a.unit) a.unit = rateUnit(c);
     if (!a.rates.some((r) => r === (c.rate ?? null))) a.rates.push(c.rate ?? null);
   }
   const charges = [...cmap.values()].map((a) => ({ ...a, amount: r2(a.amount), base: r2(a.base), rates: a.rates.sort((x, y) => num(x) - num(y)) }))
@@ -237,7 +244,7 @@ function detectVariances(g: GoodsGroup): Variance[] {
       : { field: 'rate:' + c.charge_type, label: `Ulik ${c.charge_type}-sats`, severity: 'merk', values: c.rates, note: `${c.charge_type}-satsen varierer, men gruppen spenner over flere varenumre/opphav — forskjellen kan være legitim.` });
   }
   if (g.preference_codes.length > 1) {
-    v.push({ field: 'pref', label: 'Ulik preferanse', severity: 'merk', values: g.preference_codes, note: 'Preferansekoden varierer mellom sendingene. Ofte legitimt (bevis mangler på enkeltsendinger), men verdt å sjekke mot Gjenvinning-fanen.' });
+    v.push({ field: 'pref', label: 'Ulik preferanse', severity: 'merk', values: g.preference_codes, note: 'Preferansekoden varierer mellom sendingene. Ofte legitimt (bevis mangler på enkeltsendinger), men verdt å sjekke mot Gjenvinning-siden.' });
   }
   if (g.origins.length > 1) {
     v.push({ field: 'origin', label: 'Ulikt opphav', severity: 'merk', values: g.origins, note: 'Varen er innført med ulikt opprinnelsesland.' });

@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%; --foreground: 222.2 47% 11%;
+    --background: 210 20% 98%; --foreground: 222.2 47% 11%;
     --card: 0 0% 100%; --card-foreground: 222.2 47% 11%;
     --popover: 0 0% 100%; --popover-foreground: 222.2 47% 11%;
     --primary: 221.2 83% 53%; --primary-foreground: 210 40% 98%;
@@ -15,11 +15,27 @@
     --success: 142 71% 35%; --success-foreground: 210 40% 98%;
     --border: 214.3 32% 91%; --input: 214.3 32% 91%; --ring: 221.2 83% 53%;
     --radius: 0.6rem;
+
+    /* Sidebar surface — one step off the page plane so the content pane reads as the subject. */
+    --sidebar: 222 24% 12%; --sidebar-foreground: 210 30% 92%;
+    --sidebar-accent: 222 20% 20%; --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 222 18% 20%; --sidebar-ring: 217 91% 60%;
+
+    /* Chart palette — validated with the dataviz palette validator against the card
+       surface (#ffffff light / #161a22 dark): lightness band, chroma floor, all-pairs
+       CVD separation and normal-vision floor all PASS in both modes. Slot order is the
+       colourblind-safety mechanism — never re-order, never generate a fourth hue.
+       Aqua is sub-3:1 on the light surface, so every chart using it direct-labels. */
+    --chart-1: #2a78d6;   /* blue    — Preferanse / primary series */
+    --chart-2: #eb6834;   /* orange  — RÅK */
+    --chart-3: #1baf7a;   /* aqua    — Produkt */
+    --chart-grid: 214.3 32% 91%;
   }
+
   .dark {
-    --background: 222 24% 8%; --foreground: 210 40% 96%;
+    --background: 222 26% 7%; --foreground: 210 40% 96%;
     --card: 222 22% 11%; --card-foreground: 210 40% 96%;
-    --popover: 222 22% 11%; --popover-foreground: 210 40% 96%;
+    --popover: 222 22% 13%; --popover-foreground: 210 40% 96%;
     --primary: 217 91% 60%; --primary-foreground: 222 47% 11%;
     --secondary: 217 19% 20%; --secondary-foreground: 210 40% 96%;
     --muted: 217 19% 18%; --muted-foreground: 215 20% 65%;
@@ -27,10 +43,27 @@
     --destructive: 0 63% 55%; --destructive-foreground: 210 40% 98%;
     --success: 142 65% 45%; --success-foreground: 222 47% 11%;
     --border: 217 19% 22%; --input: 217 19% 22%; --ring: 217 91% 60%;
+
+    --sidebar: 222 24% 10%; --sidebar-foreground: 210 30% 90%;
+    --sidebar-accent: 217 19% 20%; --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 217 19% 18%; --sidebar-ring: 217 91% 60%;
+
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-grid: 217 19% 22%;
   }
 }
+
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; font-feature-settings: "rlig" 1, "calt" 1; }
+  /* Recessive scrollbars — chrome should never outweigh the data. */
+  * { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; border: 3px solid transparent; background-clip: content-box; }
+  *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); background-clip: content-box; }
 }
+
+/* Columns that must align vertically. Standalone figures keep proportional digits. */
 .tabnum { font-variant-numeric: tabular-nums; }
