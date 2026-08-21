@@ -218,10 +218,24 @@ export function preferenceOpportunities({ win = claimWindow() } = {}) {
       ceiling: round2(dismissed.reduce((s, r) => s + (r.tl_amount || 0), 0)),
       items: dismissed.map((r) => ({ tollnummer: r.tollnummer, aktor: r.aktor, produkt: (r.description || '').trim(), hs_code: r.hs_code, origin: r.origin, betalt_toll: round2(r.tl_amount), begrunnelse: r.verdict?.begrunnelse })),
     },
-    // Ennå ikke agent-vurdert (restpartiet av småbeløp).
+    // Ennå ikke agent-vurdert (restpartiet av småbeløp). `groups` er arbeidslisten
+    // til scripts/assess-pref.mjs: én gruppe per pref-nøkkel (samme nøkkel som
+    // pref-verdicts.json), sortert etter betalt toll, kun linjer innenfor fristen.
     unassessed: {
       count: unassessed.length,
       ceiling: round2(unassessed.reduce((s, r) => s + (r.tl_amount || 0), 0)),
+      groups: (() => {
+        const by = new Map();
+        for (const r of unassessed) {
+          if (r.claimable === false) continue; // foreldet — ikke verdt agent-tid
+          const k = prefKey(r.hs_code, r.description, r.origin);
+          if (!by.has(k)) by.set(k, { key: k, hs_code: r.hs_code, description: (r.description || '').trim(), origin: r.origin, aktor: r.aktor, lines: 0, paid: 0, tollnummers: [] });
+          const g = by.get(k);
+          g.lines++; g.paid += r.tl_amount || 0;
+          if (r.tollnummer && !g.tollnummers.includes(r.tollnummer)) g.tollnummers.push(r.tollnummer);
+        }
+        return [...by.values()].map((g) => ({ ...g, paid: round2(g.paid) })).sort((a, b) => b.paid - a.paid);
+      })(),
     },
     expiredCount: expiredItems.length,
     expiredAmount: round2(expiredItems.reduce((s, r) => s + (r.recoverable || 0), 0)),
@@ -406,11 +420,16 @@ function vitLetter(s) {
 }
 // Agent-verifiserte dommer (data/raak-verdicts.json) overstyrer token-heuristikken:
 // «ulikt» avviser matchen, «usikker»/«trolig» → svak. Se agent-workflow verify-raak.
-let RAAK_VERDICTS = null;
+// Samme mtime-invalidering som prefVerdicts: nye dommer skal synes uten restart.
+let RAAK_VERDICTS = null, RAAK_VERDICTS_MTIME = 0;
 function raakVerdicts() {
-  if (RAAK_VERDICTS) return RAAK_VERDICTS;
-  try { RAAK_VERDICTS = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'raak-verdicts.json'), 'utf8')).verdicts || {}; }
+  const file = path.join(ROOT, 'data', 'raak-verdicts.json');
+  let mtime = 0;
+  try { mtime = fs.statSync(file).mtimeMs; } catch {}
+  if (RAAK_VERDICTS && mtime === RAAK_VERDICTS_MTIME) return RAAK_VERDICTS;
+  try { RAAK_VERDICTS = JSON.parse(fs.readFileSync(file, 'utf8')).verdicts || {}; }
   catch { RAAK_VERDICTS = {}; }
+  RAAK_VERDICTS_MTIME = mtime;
   return RAAK_VERDICTS;
 }
 const verdictFor = (description, prod) => raakVerdicts()[(description || '').trim() + '||' + (prod || '').trim()] || null;
@@ -420,11 +439,17 @@ const verdictFor = (description, prod) => raakVerdicts()[(description || '').tri
 // faktisk tollsats i tolltariffen og avgjort om det finnes en reell, tilbakevirkende refusjonsvei
 // (typisk feilklassifisering). Dommen erstatter både tier OG beløp — «ingen» fjerner kravet helt,
 // slik at taket ikke lenger blåses opp av linjer vi selv mener ikke er gjenvinnbare.
-let PREF_VERDICTS = null;
+// Cachen invalideres på mtime: `npm run assess` skriver nye dommer mens
+// serveren kjører, og neste /api/data skal se dem uten restart.
+let PREF_VERDICTS = null, PREF_VERDICTS_MTIME = 0;
 function prefVerdicts() {
-  if (PREF_VERDICTS) return PREF_VERDICTS;
-  try { PREF_VERDICTS = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'pref-verdicts.json'), 'utf8')).verdicts || {}; }
+  const file = path.join(ROOT, 'data', 'pref-verdicts.json');
+  let mtime = 0;
+  try { mtime = fs.statSync(file).mtimeMs; } catch {}
+  if (PREF_VERDICTS && mtime === PREF_VERDICTS_MTIME) return PREF_VERDICTS;
+  try { PREF_VERDICTS = JSON.parse(fs.readFileSync(file, 'utf8')).verdicts || {}; }
   catch { PREF_VERDICTS = {}; }
+  PREF_VERDICTS_MTIME = mtime;
   return PREF_VERDICTS;
 }
 export const prefKey = (hs, description, origin) =>

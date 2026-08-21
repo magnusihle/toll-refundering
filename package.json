@@ -13,6 +13,7 @@
     "query": "node src/cli.js query",
     "serve": "node src/cli.js serve",
     "auth:migrate": "node scripts/auth-migrate.mjs",
+    "assess": "node scripts/assess-pref.mjs",
     "publish": "node src/cli.js publish"
   },
   "dependencies": {

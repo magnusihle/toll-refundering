@@ -35,6 +35,21 @@ Playwright (login emmaedoc.no) ─▶ SQLite (data/emma.db) ─▶ analyse ─�
   `data/` er gitignored; mangler den, degraderer analysen stille til ingen
   presedens). Modulen feller ingen dom: den viser hva myndigheten HAR plassert
   under hver kode og lar leseren vurdere. Presedens, ikke vedtak.
+- **E-post til 3PL** (`web/src/lib/email.ts` + `web/src/lib/xlsx.ts`): ett klikk
+  på Gjenvinning-siden laster ned en formatert Excel-arbeidsbok (fanene
+  «Oversikt» — prioritert per sak, «Krav per fortolling» — begrunnelse og
+  kravtekst per krav, og «Om»), og åpner e-postprogrammet via `mailto:` med et
+  kort følgebrev (totaler per type, hastefrister, de tre anmodningene).
+  Detaljene bor i vedlegget, ikke i e-posten. Brukeren fyller inn 3PL-adressen,
+  drar inn filen og sender.
+- **Headless agent-vurdering** (`scripts/assess-pref.mjs`, `npm run assess`):
+  vurderer preferanse-gruppene som ennå ikke har dom ved å kjøre `claude -p`
+  (websøk mot tolltariffen, batcher i parallell — `--batch`/`--parallel`) og
+  merge nye dommer inn i `data/pref-verdicts.json` — samme nøkkel og skjema som
+  de eksisterende. Skriver etter hver ferdige batch, så avbrudd koster maks én
+  batch, og verdict-cachene er mtime-invalidert så et kjørende dashbord ser nye
+  dommer uten restart. Rutine etter ny innsamling: `build` → `assess` →
+  `publish`.
 - **Dashboard** (`web/`, React + Vite + shadcn/ui + react-router): sidebar-navigasjon
   med egne ruter — `/` dashbord · `/gjenvinning` · `/avgifter` · `/varer` ·
   `/deklarasjoner` · `/leverandorer`. Filtre ligger i URL-en (`?type=`, `?frist=haster`,
@@ -57,6 +72,7 @@ node src/cli.js serve                   # dashboard på http://127.0.0.1:8899
 node src/cli.js serve [port]     # kjør dashboardet lokalt (med live Refresh)
 node src/cli.js build [from to]  # inkrementell innsamling (default: hele 3-årsvinduet)
 node src/cli.js insights         # skriv gjenvinningsanalysen som JSON
+npm run assess                   # agent-vurder uvurderte preferanse-grupper (headless claude)
 node src/cli.js publish          # push lokal data → prod-DB (Neon/Vercel Postgres)
 node src/cli.js window           # vis 3-årsfristen (Europe/Oslo)
 node src/cli.js login|dump|fields  # smoke-test / selektor-tuning
