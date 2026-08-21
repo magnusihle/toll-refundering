@@ -14,6 +14,7 @@
     "serve": "node src/cli.js serve",
     "auth:migrate": "node scripts/auth-migrate.mjs",
     "assess": "node scripts/assess-pref.mjs",
+    "verify": "node scripts/verify-pref.mjs",
     "publish": "node src/cli.js publish"
   },
   "dependencies": {

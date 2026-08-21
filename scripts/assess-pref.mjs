@@ -104,7 +104,9 @@ function mergeBatch(batch, out) {
   for (const v of out?.verdicts || []) {
     const err = validate(v, byKey);
     if (err) { console.error(`  Forkastet dom: ${err}`); continue; }
-    store.verdicts[v.key] = { key: v.key, hs_plausibel: !!v.hs_plausibel, foreslatt_hs: v.foreslatt_hs || null, foreslatt_sats: v.foreslatt_sats ?? null, verifisert_sats: !!v.verifisert_sats, likelihood: v.likelihood, realistisk_belop: v.realistisk_belop, mekanisme: v.mekanisme || (v.likelihood === 'ingen' ? 'ingen' : 'ukjent'), begrunnelse: v.begrunnelse, krav_utkast: v.krav_utkast || null };
+    // `source` gjør dommene sporbare til headless-kjøringen — scripts/verify-pref.mjs
+    // andregangsvurderer høy/middels-dommer med denne stemplingen.
+    store.verdicts[v.key] = { key: v.key, hs_plausibel: !!v.hs_plausibel, foreslatt_hs: v.foreslatt_hs || null, foreslatt_sats: v.foreslatt_sats ?? null, verifisert_sats: !!v.verifisert_sats, likelihood: v.likelihood, realistisk_belop: v.realistisk_belop, mekanisme: v.mekanisme || (v.likelihood === 'ingen' ? 'ingen' : 'ukjent'), begrunnelse: v.begrunnelse, krav_utkast: v.krav_utkast || null, source: 'assess-pref' };
     saved++; if (v.likelihood === 'ingen') noBasis++;
     console.log(`  ${v.likelihood === 'ingen' ? '∅' : '✓'} ${byKey.get(v.key).description.slice(0, 45)} → ${v.likelihood}${v.realistisk_belop ? `, ${v.realistisk_belop} kr` : ''}`);
   }
