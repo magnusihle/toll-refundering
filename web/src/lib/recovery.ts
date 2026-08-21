@@ -1,5 +1,14 @@
 export const TYPES = ['alle', 'RÅK', 'Preferanse', 'Produkt'];
 
+// Menneskelige etiketter for match-nivåene. Delt mellom tabellen, e-posten og
+// Excel-eksporten så en «reclass_strong» aldri lekker rå ut til leseren.
+export const CONF_LABEL: Record<string, string> = {
+  strong: 'sterk', weak: 'svak', possible: 'mulig', review: 'til gjennomgang', info: 'produktavvik',
+  raak_grant: 'nedsettelse funnet', no_basis: 'ikke grunnlag',
+  reclass_strong: 'agent-vurdert — sterk', reclass_possible: 'agent-vurdert — mulig', reclass_weak: 'agent-vurdert — svak',
+};
+export const confLabel = (v: any) => CONF_LABEL[v] ?? (v == null ? '' : String(v));
+
 // Sannsynlighetsvekt. MÅ speile weightOf i src/analysis.js (actionList).
 // Agentens vurderte sannsynlighet går ALLTID foran match-styrken: den bygger på
 // oppslag av faktisk tollsats, mens match-styrken bare er en tekstheuristikk.

@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download, CalendarClock, HandCoins, ShieldCheck } from 'lucide-react';
+import { Download, CalendarClock, HandCoins, Mail, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
 import { Section, TableSection } from '@/components/ui/section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,22 +14,19 @@ import { expandColumn, Primary, Secondary, Code, MoneyCell, CountCell, MultiValu
 import { RowDetail, COL, entryColumns, type DetailStrip } from '@/components/table/RowDetail';
 import { useData, useEntryIndex } from '@/lib/data';
 import { n, plural } from '@/lib/format';
-import { TYPES, agg, rowsFor, groupClaims, type ClaimGroup } from '@/lib/recovery';
+import { TYPES, agg, rowsFor, groupClaims, confLabel, type ClaimGroup } from '@/lib/recovery';
+import { buildClaimEmail } from '@/lib/email';
+import { exportXlsx } from '@/lib/xlsx';
 import { navItemFor } from '@/lib/nav';
 
 const kindVariant: Record<string, any> = { Preferanse: 'default', 'RÅK': 'success', Produkt: 'warning' };
 // `reclass_*` settes av agent-dommen (TIER_BY_LIKELIHOOD i src/analysis.js) når agenten
-// har slått opp faktisk sats og overstyrt tekstheuristikken.
-const CONF_LABEL: Record<string, string> = {
-  strong: 'sterk', weak: 'svak', possible: 'mulig', review: 'til gjennomgang', info: 'produktavvik',
-  raak_grant: 'nedsettelse funnet', no_basis: 'ikke grunnlag',
-  reclass_strong: 'agent-vurdert — sterk', reclass_possible: 'agent-vurdert — mulig', reclass_weak: 'agent-vurdert — svak',
-};
+// har slått opp faktisk sats og overstyrt tekstheuristikken. Etikettene (confLabel)
+// bor i lib/recovery.ts og deles med Excel-eksporten.
 const CONF_VARIANT: Record<string, any> = {
   strong: 'success', weak: 'warning', review: 'outline', raak_grant: 'warning', no_basis: 'outline',
   reclass_strong: 'success', reclass_possible: 'warning', reclass_weak: 'outline',
 };
-const confLabel = (v: any) => CONF_LABEL[v] ?? v;
 const confVariant = (v: any): any => CONF_VARIANT[v] ?? 'secondary';
 const likVariant = (v: any) => v === 'høy' ? 'success' : v === 'middels' ? 'warning' : v === 'lav' ? 'outline' : 'secondary';
 // Årsak til at et RÅK-vedtak ikke gjaldt — brukt både i kolonnen og i utvidelsen.
@@ -37,15 +35,6 @@ const RAAK_REASON: Record<string, [string, string]> = {
   utlopt: ['Vedtak utløpt', 'avvik'],
   annen_landgruppe: ['Annen landgruppe', 'info'],
 };
-
-function exportCsv(rows: any[], suffix: string) {
-  const cols = ['kind', 'tollnummer', 'godkjent', 'aktor', 'produkt', 'confidence', 'likelihood', 'amount_nok', 'frist', 'dager_igjen', 'summary', 'action', 'claim_draft'];
-  const head = ['Type', 'Tollnummer', 'Godkjent', 'Aktør', 'Produkt', 'Match', 'Sannsynlighet', 'Beløp (NOK)', 'Frist', 'Dager igjen', 'Hva det er', 'Neste steg', 'Utkast til krav'];
-  const esc = (v: any) => '"' + String(v ?? '').replace(/"/g, '""') + '"';
-  const csv = [head.map(esc).join(';'), ...rows.map((r) => cols.map((c) => esc(r[c])).join(';'))].join('\r\n');
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'emma-gjenvinning' + suffix + '.csv'; a.click(); URL.revokeObjectURL(a.href);
-}
 
 type View = 'krav' | 'ingen-grunnlag' | 'raak-kontroll';
 
@@ -83,13 +72,43 @@ export function Recovery() {
     [act.rows, urgentOnly]
   );
   const byType = React.useMemo(() => Object.fromEntries(TYPES.map((k) => [k, agg(rowsFor(baseRows, k))])), [baseRows]);
-  // Grupperingen er REN VISNING. Beløp, haster-telling og CSV-eksport regnes alltid på
+  // Grupperingen er REN VISNING. Beløp, haster-telling og Excel-eksport regnes alltid på
   // de flate kravene, siden hver fortolling må omberegnes for seg i TVINN.
   const rows = React.useMemo(() => rowsFor(baseRows, kind), [kind, baseRows]);
   const groups = React.useMemo(() => groupClaims(rows), [rows]);
   const a = React.useMemo(() => agg(rows), [rows]);
   const suffix = (kind === 'alle' ? '' : '-' + kind) + (urgentOnly ? '-haster' : '');
   const filtered = kind !== 'alle' || urgentOnly;
+
+  // «Avvent svar»-leddet, v1: hver gang et utkast forberedes, logges det lokalt
+  // (localStorage — per nettleser, ikke delt), så siden viser hva som sist gikk
+  // til 3PL og at ballen ligger hos dem. Ingen backend-tilstand ennå.
+  const SENT_KEY = 'emma-3pl-sent';
+  const [sentLog, setSentLog] = React.useState<any[]>(() => {
+    try { return JSON.parse(localStorage.getItem(SENT_KEY) || '[]'); } catch { return []; }
+  });
+  const lastSent = sentLog[0];
+
+  // Ett klikk: Excel-arbeidsboken lastes ned (vedlegget med alle detaljene),
+  // følgebrevet legges på utklippstavlen, og e-postprogrammet åpnes med kort
+  // emne + tekst. Brukeren fyller inn 3PL-adressen, drar inn filen og sender.
+  const fileName = 'emma-gjenvinning' + suffix + '.xlsx';
+  const prepareEmail = async () => {
+    if (!rows.length) return;
+    await exportXlsx(rows, groups, fileName);
+    const email = buildClaimEmail(rows, groups, { fileName, likely: a.likely, ceiling: a.ceiling, count: a.count, urgentCount: a.urgentCount });
+    navigator.clipboard?.writeText(`Emne: ${email.subject}\n\n${email.body}`).catch(() => {});
+    // mailto-navigasjonen utsettes et øyeblikk — navigeres det umiddelbart,
+    // avbryter Chrome den ventende blob-nedlastingen av vedlegget.
+    window.setTimeout(() => { window.location.href = email.href; }, 400);
+    const next = [{ at: new Date().toISOString(), count: a.count, amount: Math.round(a.likely), filter: filtered ? [kind !== 'alle' ? kind : '', urgentOnly ? 'haster' : ''].filter(Boolean).join(' + ') : 'alle' }, ...sentLog].slice(0, 20);
+    setSentLog(next);
+    try { localStorage.setItem(SENT_KEY, JSON.stringify(next)); } catch {}
+    toast.success('E-postutkast åpnet i e-postprogrammet', {
+      duration: 15000,
+      description: `Fyll inn 3PL-adressen og legg ved ${fileName} (nettopp lastet ned). Teksten ligger også på utklippstavlen.`,
+    });
+  };
 
   // ---- Kolonner. Samme rekkefølge som Varer: emne → motpart → klassifisering →
   // omfang → tid → beløp → flagg. Alle celler kommer fra det delte vokabularet.
@@ -264,9 +283,22 @@ export function Recovery() {
         title="Gjenvinning"
         blurb={navItemFor('/gjenvinning').blurb}
         actions={view === 'krav' && (
-          <Button variant="outline" onClick={() => exportCsv(rows, suffix)}>
-            <Download />Last ned {filtered ? 'utvalget' : 'hele listen'} ({n(rows.length)})
-          </Button>
+          <div className="flex flex-col items-end gap-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" onClick={() => exportXlsx(rows, groups, fileName)}>
+                <Download />Last ned Excel {filtered ? '(utvalget)' : ''} ({n(rows.length)})
+              </Button>
+              <Button onClick={prepareEmail} disabled={!rows.length}>
+                <Mail />E-post til 3PL ({n(rows.length)} krav)
+              </Button>
+            </div>
+            {lastSent && (
+              <span className="text-xs text-muted-foreground" title={`Utvalg: ${lastSent.filter}`}>
+                Sist sendt {new Date(lastSent.at).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })}:
+                {' '}{n(lastSent.count)} krav (est. {n(lastSent.amount)} kr) — avventer svar fra 3PL.
+              </span>
+            )}
+          </div>
         )}
       />
 
@@ -380,7 +412,7 @@ export function Recovery() {
 
       <Section
         title="Slik henter du besparelsene"
-        description="Fem steg fra listen over til omberegning i TVINN."
+        description="Det meste er ett klikk — resten er å fylle inn mottaker og sende."
         footer={<>
           Datagrunnlag: {n(cov?.n)} deklarasjoner ({cov?.first || '—'} – {cov?.last || '—'}), 3-årsvindu fra {cov?.window?.from}.
           {cov?.beforeWindow ? ` ${n(cov.beforeWindow)} eldre er utelatt (foreldet).` : ''}
@@ -388,11 +420,11 @@ export function Recovery() {
         </>}
       >
         <ol className="ml-4 list-decimal space-y-1.5 text-sm text-muted-foreground">
-          <li>Last ned listen (CSV) — den har skriftlig oppsummering + neste steg per post.</li>
-          <li>Send den til <b>DSV / 3PL</b> og be om <b>omberegning i TVINN</b> for de flaggede linjene.</li>
-          <li><b>Preferanse:</b> gyldig opprinnelsesbevis. <b>RÅK:</b> oppgi <b>skrivnummeret</b> — vedtaket finnes allerede. <b>Produkt:</b> avklar HS/MVA-sats.</li>
-          <li><b>Frist: 3 år</b> etter fortolling — hastepostene foreldes snart, ta dem først.</li>
-          <li><b>Fremover:</b> be 3PL alltid legge inn preferanse + RÅK-skrivnummer, så unngås ny overbetaling.</li>
+          <li>Klikk <b>«E-post til 3PL»</b> øverst: e-postprogrammet åpnes med et kort følgebrev, og Excel-arbeidsboken med alle detaljene — prioritert oversikt, begrunnelse og kravtekst per fortolling — lastes ned samtidig.</li>
+          <li>Fyll inn adressen til <b>DSV / 3PL</b>, dra inn den nedlastede Excel-filen som vedlegg, og send. Følgebrevet ber om <b>omberegning i TVINN</b> per fortolling.</li>
+          <li><b>Preferanse:</b> gyldig opprinnelsesbevis. <b>RÅK:</b> skrivnummeret står i arket — vedtaket finnes allerede. <b>Produkt:</b> avklar HS/MVA-sats.</li>
+          <li><b>Frist: 3 år</b> etter fortolling — hastesakene står øverst i arket, med rød frist.</li>
+          <li>Avvent svar: følgebrevet ber 3PL bekrefte mottak, omberegne per fortolling, og legge inn preferanse + RÅK-skrivnummer fremover. Siste utsendelse vises ved knappene øverst.</li>
         </ol>
       </Section>
     </>
