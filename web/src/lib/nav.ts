@@ -12,7 +12,7 @@ export type NavItem = {
 export const NAV: NavItem[] = [
   { to: '/', label: 'Dashbord', icon: LayoutDashboard, group: 'Oversikt',
     blurb: 'Hva som er å hente, hvor det haster, og hva grunnlaget er.' },
-  { to: '/gjenvinning', label: 'Gjenvinning', icon: HandCoins, group: 'Analyse',
+  { to: '/gjenvinning', label: 'Refusjon', icon: HandCoins, group: 'Analyse',
     blurb: 'Krav mot DSV/3PL — vektet beløp, frist og neste steg per post.' },
   { to: '/varer', label: 'Varer', icon: Package, group: 'Grunnlag',
     blurb: 'Én rad per vare på tvers av sendingene, med avvik i behandlingen — ulikt varenummer, ulik sats — løftet fram.' },

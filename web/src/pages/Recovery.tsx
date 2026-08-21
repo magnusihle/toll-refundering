@@ -289,7 +289,7 @@ export function Recovery() {
   return (
     <>
       <PageHeader
-        title="Gjenvinning"
+        title="Refusjon"
         blurb={navItemFor('/gjenvinning').blurb}
         actions={view === 'krav' && (
           <div className="flex flex-col items-end gap-1.5">
