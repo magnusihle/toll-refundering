@@ -13,6 +13,7 @@ import { Amount, Num } from '@/components/ui/metric';
 import { expandColumn, Primary, Secondary, Code, MoneyCell, CountCell, MultiValue, Deadline } from '@/components/table/cells';
 import { RowDetail, COL, entryColumns, type DetailStrip } from '@/components/table/RowDetail';
 import { useData, useEntryIndex } from '@/lib/data';
+import { getSent, postSent } from '@/lib/api';
 import { n, plural } from '@/lib/format';
 import { TYPES, agg, rowsFor, groupClaims, confLabel, type ClaimGroup } from '@/lib/recovery';
 import { buildClaimEmail } from '@/lib/email';
@@ -80,13 +81,15 @@ export function Recovery() {
   const suffix = (kind === 'alle' ? '' : '-' + kind) + (urgentOnly ? '-haster' : '');
   const filtered = kind !== 'alle' || urgentOnly;
 
-  // «Avvent svar»-leddet, v1: hver gang et utkast forberedes, logges det lokalt
-  // (localStorage — per nettleser, ikke delt), så siden viser hva som sist gikk
-  // til 3PL og at ballen ligger hos dem. Ingen backend-tilstand ennå.
+  // «Avvent svar»-leddet: sendeloggen bor på serveren (SQLite lokalt, Postgres
+  // hosted via api/sent.js) så alle ser samme status på tvers av nettlesere.
+  // localStorage er kun fallback mot en eldre server-prosess uten /api/sent.
   const SENT_KEY = 'emma-3pl-sent';
-  const [sentLog, setSentLog] = React.useState<any[]>(() => {
-    try { return JSON.parse(localStorage.getItem(SENT_KEY) || '[]'); } catch { return []; }
-  });
+  const [sentLog, setSentLog] = React.useState<any[]>([]);
+  React.useEffect(() => {
+    getSent().then((d) => setSentLog(d.items ?? []))
+      .catch(() => { try { setSentLog(JSON.parse(localStorage.getItem(SENT_KEY) || '[]')); } catch {} });
+  }, []);
   const lastSent = sentLog[0];
 
   // Ett klikk: Excel-arbeidsboken lastes ned (vedlegget med alle detaljene),
@@ -103,9 +106,13 @@ export function Recovery() {
     // mailto-navigasjonen utsettes et øyeblikk — navigeres det umiddelbart,
     // avbryter Chrome den ventende blob-nedlastingen av vedlegget.
     window.setTimeout(() => { window.location.href = email.href; }, 400);
-    const next = [{ at: new Date().toISOString(), count: email.count, amount: email.likely, filter: filtered ? [kind !== 'alle' ? kind : '', urgentOnly ? 'haster' : ''].filter(Boolean).join(' + ') : 'alle' }, ...sentLog].slice(0, 20);
-    setSentLog(next);
-    try { localStorage.setItem(SENT_KEY, JSON.stringify(next)); } catch {}
+    const entry = { count: email.count, amount: email.likely, filter: filtered ? [kind !== 'alle' ? kind : '', urgentOnly ? 'haster' : ''].filter(Boolean).join(' + ') : 'alle' };
+    postSent(entry).then((d) => setSentLog(d.items ?? []))
+      .catch(() => {
+        const next = [{ at: new Date().toISOString(), ...entry }, ...sentLog].slice(0, 20);
+        setSentLog(next);
+        try { localStorage.setItem(SENT_KEY, JSON.stringify(next)); } catch {}
+      });
     toast.success('E-postutkast åpnet i e-postprogrammet', {
       duration: 15000,
       description: `Fyll inn 3PL-adressen og legg ved ${fileName} (nettopp lastet ned). Teksten ligger også på utklippstavlen.`,
@@ -295,7 +302,7 @@ export function Recovery() {
               </Button>
             </div>
             {lastSent && (
-              <span className="text-xs text-muted-foreground" title={`Utvalg: ${lastSent.filter}`}>
+              <span className="text-xs text-muted-foreground" title={`Utvalg: ${lastSent.filter || 'alle'}${lastSent.sender ? ' · av ' + lastSent.sender : ''}`}>
                 Sist sendt {new Date(lastSent.at).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' })}:
                 {' '}{n(lastSent.count)} krav (est. {n(lastSent.amount)} kr) — avventer svar fra 3PL.
               </span>

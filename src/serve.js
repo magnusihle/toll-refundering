@@ -5,7 +5,7 @@ import { ROOT } from './config.js';
 import { dashboardData, ensureWebBuilt } from './dashboard.js';
 import { getRates } from './fx.js';
 import { buildDataset } from './pipeline.js';
-import { summary, existingTollnummers } from './db.js';
+import { summary, existingTollnummers, addSentLog, sentLog } from './db.js';
 import { claimWindow } from './period.js';
 
 // Local served app: serves the React (web/dist) build and the /api endpoints,
@@ -19,6 +19,13 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 
 let job = null;
 function json(res, code, obj) { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj)); }
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let b = '';
+    req.on('data', (c) => { b += c; if (b.length > 65536) reject(new Error('body too large')); });
+    req.on('end', () => { try { resolve(b ? JSON.parse(b) : {}); } catch (e) { reject(e); } });
+  });
+}
 
 async function startRefresh() {
   if (job && job.state === 'running') return job;
@@ -50,6 +57,15 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/data') { const data = dashboardData(); data.meta.fx = await getRates(); return json(res, 200, data); }
     if (p === '/api/fx') return json(res, 200, await getRates());
     if (p === '/api/status') return json(res, 200, { db: summary(), have: existingTollnummers().size, period: claimWindow(), job: job && { state: job.state, message: job.message } });
+    // Sendeloggen: hva som er forberedt/sendt til 3PL — delt tilstand i SQLite,
+    // så «avventer svar» ikke bor i én enkelt nettlesers localStorage.
+    if (p === '/api/sent' && req.method === 'POST') {
+      const b = await readBody(req);
+      if (!Number.isFinite(Number(b.count)) || !Number.isFinite(Number(b.amount))) return json(res, 400, { error: 'count/amount mangler' });
+      addSentLog({ count: Number(b.count), amount: Number(b.amount), filter: typeof b.filter === 'string' ? b.filter.slice(0, 100) : null });
+      return json(res, 200, { items: sentLog() });
+    }
+    if (p === '/api/sent') return json(res, 200, { items: sentLog() });
     if (p === '/api/refresh' && req.method === 'POST') { const j = await startRefresh(); return json(res, 202, { id: j.id, state: j.state }); }
     if (p === '/api/refresh/status') { if (!job) return json(res, 200, { state: 'idle' }); return json(res, 200, { state: job.state, message: job.message, log: job.log.slice(-8), report: job.state === 'done' ? job.report : null }); }
     if (p.startsWith('/api/')) return json(res, 404, { error: 'not found' });

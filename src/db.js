@@ -54,6 +54,14 @@ function migrate(db) {
     tollnummer TEXT REFERENCES declarations(tollnummer) ON DELETE CASCADE,
     doc_type TEXT, filename TEXT, path TEXT, url TEXT
   );
+  CREATE TABLE IF NOT EXISTS sent_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    at TEXT NOT NULL,
+    count INTEGER NOT NULL,
+    amount REAL NOT NULL,
+    filter TEXT,
+    sender TEXT
+  );
   CREATE INDEX IF NOT EXISTS idx_goods_hs ON goods_lines(hs_code);
   CREATE INDEX IF NOT EXISTS idx_goods_pk ON goods_lines(product_key);
   CREATE INDEX IF NOT EXISTS idx_charge_line ON line_charges(goods_line_id);
@@ -148,4 +156,17 @@ export function addLineCharges(tollnummer, itemNumber, charges) {
   let n = 0;
   for (const c of charges) { ins.run(row.id, c.source ?? null, c.charge_type ?? null, c.base ?? null, c.rate ?? null, c.amount ?? null, c.payment_method ?? null); n++; }
   return n;
+}
+
+// ---- Sendelogg («avvent svar»-leddet): hva som er forberedt/sendt til 3PL. ----
+// Delt tilstand, ikke per nettleser — det hostede dashbordet har sin egen
+// Postgres-tvilling i api/sent.js med samme kolonner.
+export function addSentLog({ count, amount, filter = null, sender = null }) {
+  const d = getDb();
+  d.prepare('INSERT INTO sent_log (at, count, amount, filter, sender) VALUES (?, ?, ?, ?, ?)')
+    .run(new Date().toISOString(), Math.round(count), Math.round(amount), filter, sender);
+}
+
+export function sentLog(limit = 20) {
+  return getDb().prepare('SELECT at, count, amount, filter, sender FROM sent_log ORDER BY id DESC LIMIT ?').all(limit);
 }
