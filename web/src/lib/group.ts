@@ -244,7 +244,7 @@ function detectVariances(g: GoodsGroup): Variance[] {
       : { field: 'rate:' + c.charge_type, label: `Ulik ${c.charge_type}-sats`, severity: 'merk', values: c.rates, note: `${c.charge_type}-satsen varierer, men gruppen spenner over flere varenumre/opphav — forskjellen kan være legitim.` });
   }
   if (g.preference_codes.length > 1) {
-    v.push({ field: 'pref', label: 'Ulik preferanse', severity: 'merk', values: g.preference_codes, note: 'Preferansekoden varierer mellom sendingene. Ofte legitimt (bevis mangler på enkeltsendinger), men verdt å sjekke mot Gjenvinning-siden.' });
+    v.push({ field: 'pref', label: 'Ulik preferanse', severity: 'merk', values: g.preference_codes, note: 'Preferansekoden varierer mellom sendingene. Ofte legitimt (bevis mangler på enkeltsendinger), men verdt å sjekke mot Refusjon-siden.' });
   }
   if (g.origins.length > 1) {
     v.push({ field: 'origin', label: 'Ulikt opphav', severity: 'merk', values: g.origins, note: 'Varen er innført med ulikt opprinnelsesland.' });
