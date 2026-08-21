@@ -1,4 +1,4 @@
-import { confLabel, type ClaimGroup } from '@/lib/recovery';
+import { confLabel, splitByMateriality, SMALL_CLAIM_NOK, type ClaimGroup } from '@/lib/recovery';
 
 // Excel-arbeidsboken er vedlegget 3PL faktisk jobber i — detaljene bor HER,
 // ikke i e-posten. Tre faner:
@@ -6,6 +6,8 @@ import { confLabel, type ClaimGroup } from '@/lib/recovery';
 //                        haster først, så beløp. Det 3PL prioriterer etter.
 //   «Krav per fortolling» én rad per krav — begrunnelse, neste steg og utkast
 //                        til kravtekst. Det 3PL omberegner etter.
+//   «Småkrav»            saker under materialitetsgrensen — én rad per sak,
+//                        tas ved anledning, blander ikke støy inn i hovedlisten.
 //   «Om»                 hva kolonnene betyr og hvordan tallene er vurdert.
 // exceljs importeres dynamisk: ~1 MB som ikke skal inn i hovedbunten.
 
@@ -25,6 +27,10 @@ export async function buildClaimWorkbook(rows: any[], groups: ClaimGroup[]) {
   wb.creator = 'toll-refundering';
   wb.created = new Date();
 
+  // Hovedfanene inneholder bare de materielle sakene; småkravene får egen fane.
+  const { material, small } = splitByMateriality(groups);
+  const materialRows = material.flatMap((g) => g.claims);
+
   // ---- Fane 1: Oversikt (én rad per sak) ----
   const ov = wb.addWorksheet('Oversikt', { views: [{ state: 'frozen', ySplit: 1 }] });
   ov.columns = [
@@ -40,7 +46,7 @@ export async function buildClaimWorkbook(rows: any[], groups: ClaimGroup[]) {
     { header: 'Sannsynlighet', key: 'lik', width: 13 },
     { header: 'Tollnummer', key: 'tollnummer', width: 40 },
   ];
-  const ordered = [...groups].sort((a, b) => {
+  const ordered = [...material].sort((a, b) => {
     const ua = a.dager_igjen != null && a.dager_igjen <= 90 ? 1 : 0;
     const ub = b.dager_igjen != null && b.dager_igjen <= 90 ? 1 : 0;
     return ub - ua || b.amount_nok - a.amount_nok;
@@ -56,7 +62,7 @@ export async function buildClaimWorkbook(rows: any[], groups: ClaimGroup[]) {
     });
     if (urgent) { row.getCell('frist').font = URGENT_FONT; row.getCell('dager').font = URGENT_FONT; }
   });
-  const sumRow = ov.addRow({ produkt: 'SUM', belop: Math.round(groups.reduce((s, g) => s + g.amount_nok, 0)) });
+  const sumRow = ov.addRow({ produkt: 'SUM', belop: Math.round(material.reduce((s, g) => s + g.amount_nok, 0)) });
   sumRow.font = { bold: true };
 
   // ---- Fane 2: Krav per fortolling (flat — det som omberegnes) ----
@@ -76,7 +82,7 @@ export async function buildClaimWorkbook(rows: any[], groups: ClaimGroup[]) {
     { header: 'Neste steg', key: 'action', width: 70, style: { alignment: { wrapText: true, vertical: 'top' } } },
     { header: 'Utkast til kravtekst', key: 'draft', width: 70, style: { alignment: { wrapText: true, vertical: 'top' } } },
   ];
-  const flat = [...rows].sort((a, b) => (a.dager_igjen ?? Infinity) - (b.dager_igjen ?? Infinity) || (b.amount_nok || 0) - (a.amount_nok || 0));
+  const flat = [...materialRows].sort((a, b) => (a.dager_igjen ?? Infinity) - (b.dager_igjen ?? Infinity) || (b.amount_nok || 0) - (a.amount_nok || 0));
   for (const r of flat) {
     const row = kr.addRow({
       kind: r.kind, tollnummer: r.tollnummer ?? '', godkjent: r.godkjent ?? '', aktor: r.aktor ?? '',
@@ -87,7 +93,33 @@ export async function buildClaimWorkbook(rows: any[], groups: ClaimGroup[]) {
     if (r.dager_igjen != null && r.dager_igjen <= 90) { row.getCell('frist').font = URGENT_FONT; row.getCell('dager').font = URGENT_FONT; }
   }
 
-  // ---- Fane 3: Om ----
+  // ---- Fane 3: Småkrav (under materialitetsgrensen — tas ved anledning) ----
+  let sm: any = null;
+  if (small.length) {
+    sm = wb.addWorksheet('Småkrav', { views: [{ state: 'frozen', ySplit: 1 }] });
+    sm.columns = [
+      { header: 'Produkt', key: 'produkt', width: 36 },
+      { header: 'Leverandør', key: 'aktor', width: 24 },
+      { header: 'Type', key: 'kind', width: 11 },
+      { header: 'Fortollinger', key: 'antall', width: 12 },
+      { header: 'Beløp (NOK)', key: 'belop', width: 13, style: { numFmt: NOK_FMT } },
+      { header: 'Første frist', key: 'frist', width: 12 },
+      { header: 'Neste steg', key: 'action', width: 70, style: { alignment: { wrapText: true, vertical: 'top' } } },
+      { header: 'Tollnummer', key: 'tollnummer', width: 40 },
+    ];
+    for (const g of [...small].sort((a, b) => b.amount_nok - a.amount_nok)) {
+      sm.addRow({
+        produkt: g.produkt, aktor: g.aktor ?? '', kind: g.kind,
+        antall: g.tollnummers.length || g.count, belop: Math.round(g.amount_nok), frist: g.frist ?? '',
+        action: g.shared.action || 'Se vurderingen i dashbordet — varierer per fortolling.',
+        tollnummer: g.tollnummers.join(', '),
+      });
+    }
+    const smSum = sm.addRow({ produkt: 'SUM', belop: Math.round(small.reduce((s, g) => s + g.amount_nok, 0)) });
+    smSum.font = { bold: true };
+  }
+
+  // ---- Fane 4: Om ----
   const om = wb.addWorksheet('Om');
   om.columns = [{ width: 110 }];
   [
@@ -103,9 +135,14 @@ export async function buildClaimWorkbook(rows: any[], groups: ClaimGroup[]) {
     'Type: RÅK = innvilget tollnedsettelse ble ikke brukt (skrivnummer står i «Neste steg»). Preferanse = EØS-opphav',
     'uten at preferanse/riktig klassifisering ble krevd. Produkt = samme vare deklarert ulikt (datakvalitet — rettes',
     'fremover, ikke refusjonskrav).',
+    ...(small.length ? [
+      '',
+      `«Småkrav»: saker under ${SMALL_CLAIM_NOK} kr samlet. De er reelle, men håndteringskosten kan overstige beløpet —`,
+      'ta dem ved anledning, gjerne samtidig med en hovedsak mot samme fortolling. De telles ikke i hovedfanenes SUM.',
+    ] : []),
   ].forEach((t) => om.addRow([t]));
 
-  for (const ws of [ov, kr]) {
+  for (const ws of [ov, kr, ...(sm ? [sm] : [])]) {
     ws.getRow(1).font = { ...HEADER_FONT };
     ws.getRow(1).fill = { ...HEADER_FILL } as any;
     ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: ws.columns.length } };

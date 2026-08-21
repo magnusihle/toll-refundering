@@ -96,12 +96,14 @@ export function Recovery() {
   const prepareEmail = async () => {
     if (!rows.length) return;
     await exportXlsx(rows, groups, fileName);
-    const email = buildClaimEmail(rows, groups, { fileName, likely: a.likely, ceiling: a.ceiling, count: a.count, urgentCount: a.urgentCount });
+    // E-postens tall er de materielle (samme kutt som arkets hovedfaner) —
+    // sendeloggen skal speile det som faktisk ble bedt om.
+    const email = buildClaimEmail(groups, { fileName });
     navigator.clipboard?.writeText(`Emne: ${email.subject}\n\n${email.body}`).catch(() => {});
     // mailto-navigasjonen utsettes et øyeblikk — navigeres det umiddelbart,
     // avbryter Chrome den ventende blob-nedlastingen av vedlegget.
     window.setTimeout(() => { window.location.href = email.href; }, 400);
-    const next = [{ at: new Date().toISOString(), count: a.count, amount: Math.round(a.likely), filter: filtered ? [kind !== 'alle' ? kind : '', urgentOnly ? 'haster' : ''].filter(Boolean).join(' + ') : 'alle' }, ...sentLog].slice(0, 20);
+    const next = [{ at: new Date().toISOString(), count: email.count, amount: email.likely, filter: filtered ? [kind !== 'alle' ? kind : '', urgentOnly ? 'haster' : ''].filter(Boolean).join(' + ') : 'alle' }, ...sentLog].slice(0, 20);
     setSentLog(next);
     try { localStorage.setItem(SENT_KEY, JSON.stringify(next)); } catch {}
     toast.success('E-postutkast åpnet i e-postprogrammet', {

@@ -1,5 +1,18 @@
 export const TYPES = ['alle', 'RÅK', 'Preferanse', 'Produkt'];
 
+// Materialitetsgrense for det som SENDES til 3PL: saker (grupper) under dette
+// beløpet legges i egen «Småkrav»-fane i arket og nevnes bare som én linje i
+// e-posten — hver omberegning har håndteringskost, og 2 kr-krav svekker
+// troverdigheten til resten av listen. Gjelder KUN e-post/eksport; dashbordet
+// viser og summerer fortsatt alt.
+export const SMALL_CLAIM_NOK = 100;
+export const splitByMateriality = (groups: ClaimGroup[]) => {
+  const small = groups.filter((g) => g.amount_nok < SMALL_CLAIM_NOK);
+  // Er alt smått, finnes ingen «hovedliste» å beskytte — da sendes alt som før.
+  if (small.length === groups.length) return { material: groups, small: [] as ClaimGroup[] };
+  return { material: groups.filter((g) => g.amount_nok >= SMALL_CLAIM_NOK), small };
+};
+
 // Menneskelige etiketter for match-nivåene. Delt mellom tabellen, e-posten og
 // Excel-eksporten så en «reclass_strong» aldri lekker rå ut til leseren.
 export const CONF_LABEL: Record<string, string> = {
