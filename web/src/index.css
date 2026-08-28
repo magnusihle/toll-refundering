@@ -76,6 +76,17 @@
     --chart-2: #bd8708;   /* bronse     — RÅK */
     --chart-3: #8e2b24;   /* terrakotta — Produkt */
     --chart-grid: 42.4 23.9% 86.1%;
+
+    /* Rullesonen i innholdskortet, i piksler. Tabellene måler seg mot denne,
+       og den skal stemme på pikselen: en tabell som er høyere enn flaten kan
+       ikke bli tom, og fasen «siden ruller videre» starter for sent.
+       Vinduet minus topplinjen (h-16) og streken under den. */
+    --page-scroll: calc(100svh - 4rem - 1px);
+  }
+
+  /* Fra md står innholdet i et kort med 0,5rem ramme og hårfin kant rundt. */
+  @media (min-width: 768px) {
+    :root { --page-scroll: calc(100svh - 1rem - 2px - 4rem - 1px); }
   }
 
   /* Mørk modus er EGNE trinn fra de samme ankrene, validert mot den mørke
@@ -130,7 +141,11 @@
 
 @layer base {
   * { @apply border-border; }
-  body { @apply bg-background text-foreground; font-feature-settings: "rlig" 1, "calt" 1; }
+  /* Flaten under alt er rammen rundt innholdskortet, ikke papiret. Ruller du
+     forbi kanten på en bred skjerm — gummistrikk-effekten — er det denne fargen
+     som ligger der, og en hvit stripe utenfor forest-deep leser som en feil.
+     Innloggings- og feilskjermene maler sin egen `bg-background`. */
+  body { @apply bg-sidebar text-foreground; font-feature-settings: "rlig" 1, "calt" 1; }
 
   /* Systemstacken har ingen vekt mellom Medium (500) og Bold (700), så «litt
      tykkere» overskrifter løses med en hårfin stroke i tekstfargen i stedet for

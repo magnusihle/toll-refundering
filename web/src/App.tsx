@@ -20,8 +20,8 @@ function LoadingScreen() {
   // Skjelettet må tegne DEN layouten som lastes inn — ellers blinker appen én
   // struktur og bytter til en annen. Mål her speiler Layout/Header/AppSidebar.
   return (
-    <div className="flex min-h-svh">
-      <div className="hidden w-[15.5rem] shrink-0 bg-sidebar p-2 md:block">
+    <div className="flex h-svh bg-sidebar">
+      <div className="hidden w-[15.5rem] shrink-0 p-2 md:block">
         <Skeleton className="h-12 w-full bg-white/[0.07]" />
         <div className="mt-5 space-y-1.5">
           {Array.from({ length: 6 }).map((_, i) => (
@@ -29,9 +29,9 @@ function LoadingScreen() {
           ))}
         </div>
       </div>
-      <div className="flex-1">
+      <div className="flex-1 overflow-hidden bg-background md:m-2 md:rounded-xl">
         <div className="h-16 border-b border-border" />
-        <div className="mx-auto max-w-[1280px] space-y-12 px-6 pb-20 pt-9 md:space-y-16 md:px-10 lg:px-16">
+        <div className="mx-auto max-w-[1680px] space-y-12 px-6 pb-20 pt-7 md:space-y-16 md:px-10 lg:px-16">
           <div>
             <Skeleton className="h-9 w-56" />
             <Skeleton className="mt-4 h-5 w-[32rem] max-w-full" />

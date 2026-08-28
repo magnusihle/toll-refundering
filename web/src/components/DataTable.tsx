@@ -211,10 +211,11 @@ export function DataTable<T>({
             className="pointer-events-none absolute inset-y-0 right-0 z-20 w-12 bg-gradient-to-l from-background via-background/70 to-transparent"
           />
         ) : null}
-        {/* Høyden er nøyaktig vinduet under topplinjen (h-16). Da fyller tabellen
-            flaten når den ligger på linjen, og fasen «hjulet tilhører tabellen»
-            har en synlig grunn: det er ikke noe annet på skjermen. */}
-        <Table wrapperRef={scroller} wrapperClassName="max-h-[calc(100svh-4rem)]">
+        {/* Høyden er nøyaktig rulleflaten i innholdskortet (`--page-scroll`).
+            Da fyller tabellen flaten når den ligger på linjen, og fasen «hjulet
+            tilhører tabellen» har en synlig grunn: det er ikke noe annet på
+            skjermen. */}
+        <Table wrapperRef={scroller} wrapperClassName="max-h-[--page-scroll]">
           <TableHeader className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (
               <TableRow key={hg.id} className="hover:bg-transparent">

@@ -28,6 +28,33 @@ To bevisste avvik fra landingssiden, begge besluttet av Magnus 2026-08-27:
    forest-deep-familien, aldri de kjølige slate-tonene shadcn kommer med.
 2. **Diagramfarger finnes her.** Landingssiden har ingen. Se eget avsnitt.
 
+## Skallet — navigasjon uten streker, innhold i ett kort
+
+Appen har to flater og én kant mellom dem. Navigasjonen er forest-deep helt ut
+til vinduskanten, og innholdet står i ET KORT som flyter i den samme flaten:
+0,5rem ramme rundt, `rounded-xl`, hårfin `--border` rundt kanten. Formen er
+shadcn sin `dashboard-01`, med Declaros farger — ingen nye tokens, kortflaten er
+nøyaktig den `--background` siden hadde før.
+
+**Navigasjonen har ingen streker.** Ingen kant til høyre, ingen skillelinje under
+merket, ingen strek over 3-årsvinduet, ingen ramme rundt ordmerket. Gruppene
+skilles av luft og eyebrows, slik seksjonene på en side gjør. Kortkanten er den
+ENESTE linjen i skallet, og det er den som skiller navigasjon fra innhold.
+
+**Kanten på kortet betyr mest i mørk modus.** Der ligger kortflaten (#101A15) og
+rammen (#0B1712) tett, og uten kanten flyter de sammen. I lys modus gjør papir
+mot forest-deep jobben alene, men kanten står i begge moduser — én form, ikke to.
+
+**Kortet står stille, innholdet ruller.** Kortet er nøyaktig vinduet høyt minus
+rammen, topplinjen er første rad i det, og rullingen ligger i kortets egen flate
+(`SidebarScroll`, `data-app-scroll`). Vinduet ruller ikke i det hele tatt.
+Topplinjen trenger derfor ingen `sticky` for å bli stående, og rammen rundt
+kortet forsvinner aldri under den.
+
+*Merk:* kortet er SKALLET, ikke seksjonene. Regelen «seksjoner er åpne, ikke
+kort» under «Formspråk» står uendret — inne i kortet skiller avstand fortsatt
+seksjonene, og det er ingen kort i rutenett.
+
 ## Tetthetsbudsjett — arbeidsflate, ikke kundeflate
 
 Landingssiden og appen deler palett, typografi og tone. Det som skiller dem er
@@ -194,8 +221,12 @@ Modellen har tre faser, og gjelder ALLE tabeller (`lib/tablescroll.ts`):
    under.
 
 Oppover er det det samme i revers, så veien ned og veien opp er den samme veien.
-Tabellen er derfor nøyaktig `100svh - 4rem` høy: når den ligger på linjen fyller
-den flaten, og fase 2 har en synlig grunn — det er ikke noe annet på skjermen.
+«Siden» er kortets egen rulleflate (`data-app-scroll`), ikke vinduet — vinduet
+ruller ikke. Tabellen er derfor nøyaktig så høy som den flaten:
+`--page-scroll` i `index.css`, som er vinduet minus topplinjen, og fra `md` også
+minus rammen og kanten rundt kortet. Når tabellen ligger på linjen fyller den
+flaten, og fase 2 har en synlig grunn — det er ikke noe annet på skjermen.
+Endrer du rammen rundt kortet, endrer du `--page-scroll` i samme slengen.
 
 Vi tar bare over hjulet der nettleseren ville gjort noe annet enn dette. Ruller
 siden mot en tabell langt nede, gjør den allerede det riktige, og beholder sin
@@ -355,7 +386,8 @@ Dette er hoveddelen av tilpasningen. shadcn er fortsatt grunnlaget — Radix,
 komponent-API-ene og variantene står urørt — men uttrykket er lagt om fra
 «admin-dashboard» til landingssidens redaksjonelle språk.
 
-**Seksjoner er åpne, ikke kort.** DESIGN.md: «open sections and ruled rows over
+**Seksjoner er åpne, ikke kort.** Dette gjelder INNHOLDET; skallet er et kort,
+se «Skallet». DESIGN.md: «open sections and ruled rows over
 grids of generic cards». Magnus fjernet dessuten hairline-topplinjene mellom
 stegene på landingssiden med begrunnelsen at overskrift og luft skal lage
 strukturen. Seksjoner separeres derfor av AVSTAND alene, og avstanden eies av

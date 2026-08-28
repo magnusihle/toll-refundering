@@ -13,7 +13,6 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useData } from "@/lib/data";
@@ -56,12 +55,13 @@ export function AppSidebar() {
     to === "/" ? pathname === "/" : pathname.startsWith(to);
 
   return (
-    <Sidebar collapsible="icon" className="border-sidebar-border">
+    <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2.5 px-1.5 py-2.5">
           {/* Ordmerket, ikke et oppfunnet symbol (DESIGN.md). Sammentrukket
-              sidebar faller tilbake til forbokstaven. */}
-          <div className="grid size-8 shrink-0 place-items-center rounded-md border border-sidebar-border text-base font-medium text-sidebar-foreground group-data-[collapsible=icon]:border-transparent">
+              sidebar faller tilbake til forbokstaven. Ingen ramme rundt: navi-
+              gasjonen har ingen streker, kortet er det eneste som har kant. */}
+          <div className="grid size-8 shrink-0 place-items-center rounded-md text-base font-medium text-sidebar-foreground">
             D
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
@@ -74,8 +74,6 @@ export function AppSidebar() {
           </div>
         </div>
       </SidebarHeader>
-
-      <SidebarSeparator />
 
       <SidebarContent>
         {GROUPS.map((group) => (
@@ -123,7 +121,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="border-t border-sidebar-border px-2 pb-1 pt-3 text-2xs leading-relaxed text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
+        <div className="px-2 pb-1 pt-3 text-2xs leading-relaxed text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
           <div className="t-eyebrow mb-1.5 text-sidebar-foreground/45">
             3-årsvindu
           </div>

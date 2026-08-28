@@ -42,6 +42,16 @@ const NATIVE_MARGIN = 800;
 const scrollers = new Set<HTMLElement>();
 let listening = false;
 
+/**
+ * Sidens rulleflate. Innholdet ligger i et kort som står stille (`SidebarScroll`),
+ * så «siden ruller» betyr å rulle DEN flaten — ikke vinduet, som ikke ruller i
+ * det hele tatt. Vi slår den opp per hendelse: kortet byttes ut ved innlogging
+ * og ved feilskjerm, og en lagret referanse hadde pekt på et dødt element.
+ */
+function appScroller(): HTMLElement | null {
+  return document.querySelector('[data-app-scroll]');
+}
+
 /** Linjen tabellen legger seg på: underkanten av topplinjen. */
 function pinTop() {
   const header = document.querySelector('[data-app-header]');
@@ -68,6 +78,10 @@ function under(target: EventTarget | null, dy: number): HTMLElement | null {
   let el = target instanceof Element ? (target as HTMLElement) : null;
   while (el) {
     if (scrollers.has(el)) return el;
+    // Sidens egen rulleflate er ikke en fremmed sone — den ER «siden», og fase 1
+    // og 3 er nettopp at den ruller. Uten dette hadde hvert hjuldrag på siden
+    // truffet den først og slått av hele modellen.
+    if (el.hasAttribute('data-app-scroll')) return null;
     const style = getComputedStyle(el);
     if ((style.overflowY === 'auto' || style.overflowY === 'scroll') && canScroll(el, dy)) return el;
     el = el.parentElement;
@@ -91,7 +105,9 @@ function current(dy: number, pin: number): HTMLElement | null {
  * forbi linjen.
  */
 function page(delta: number) {
-  window.scrollTo(0, window.scrollY + delta);
+  const el = appScroller();
+  if (el) el.scrollTop = el.scrollTop + delta;
+  else window.scrollTo(0, window.scrollY + delta);
 }
 
 /** Kjør resten inn i tabellen, og gi det den ikke får plass til videre til siden. */

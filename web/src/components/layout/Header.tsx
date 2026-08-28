@@ -110,12 +110,13 @@ export function Header() {
   const stampLabel = new Date(stamp).toLocaleDateString('nb-NO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <header data-app-header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
+    <header data-app-header className="z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-1 h-5" />
       {/* Sidens ENE overskrift. Sto tidligere også som <h1 class="t-page"> i
-          sidekroppen — samme ord to ganger, 60 px fra hverandre. Her følger den
-          med når du scroller en tabell på 933 rader. */}
+          sidekroppen — samme ord to ganger, 60 px fra hverandre. Den blir
+          stående når du ruller en tabell på 933 rader: rullingen ligger i
+          kortets egen flate under topplinjen, ikke i vinduet. */}
       <div className="flex min-w-0 items-center gap-2">
         <item.icon className="size-4 shrink-0 text-muted-foreground" />
         <h1 className="t-small truncate font-medium">{item.label}</h1>

@@ -164,7 +164,7 @@ const Sidebar = React.forwardRef<
             : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',
           variant === 'floating' || variant === 'inset'
             ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]'
-            : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l',
+            : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon]',
           className
         )}
         {...props}
@@ -205,18 +205,37 @@ const SidebarTrigger = React.forwardRef<React.ElementRef<typeof Button>, React.C
 );
 SidebarTrigger.displayName = 'SidebarTrigger';
 
+/**
+ * Innholdsflaten er ET KORT som står stille, ikke en side som ruller.
+ *
+ * Kortet er nøyaktig vinduet høyt (minus rammen), og rullingen ligger i
+ * `SidebarScroll` inne i det. Da er rammen alltid synlig, topplinjen trenger
+ * ingen `sticky` for å bli stående, og tabellenes pin-modell har en fast linje å
+ * legge seg på. Flaten er `bg-background` — samme farge som siden hadde før
+ * kortet — og rammen rundt males av `SidebarProvider`.
+ */
 const SidebarInset = React.forwardRef<HTMLDivElement, React.ComponentProps<'main'>>(({ className, ...props }, ref) => (
   <main
     ref={ref}
     className={cn(
-      'relative flex min-h-svh w-full min-w-0 flex-1 flex-col bg-background',
-      'peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow',
+      'relative flex h-svh w-full min-w-0 flex-1 flex-col overflow-hidden bg-background',
+      'md:m-2 md:h-[calc(100svh-theme(spacing.4))] md:rounded-xl md:border md:border-border',
       className
     )}
     {...props}
   />
 ));
 SidebarInset.displayName = 'SidebarInset';
+
+/**
+ * Sidens rulleflate. `data-app-scroll` er kontrakten mot `lib/tablescroll.ts`:
+ * den ruller DENNE i stedet for vinduet, og regner den ikke som en fremmed
+ * rullesone når hjulet går gjennom den.
+ */
+const SidebarScroll = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(({ className, ...props }, ref) => (
+  <div ref={ref} data-app-scroll className={cn('min-h-0 flex-1 overflow-y-auto', className)} {...props} />
+));
+SidebarScroll.displayName = 'SidebarScroll';
 
 const SidebarInput = React.forwardRef<React.ElementRef<typeof Input>, React.ComponentProps<typeof Input>>(
   ({ className, ...props }, ref) => (
@@ -365,5 +384,5 @@ SidebarMenuSkeleton.displayName = 'SidebarMenuSkeleton';
 export {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
   SidebarInput, SidebarInset, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarMenuSkeleton,
-  SidebarProvider, SidebarSeparator, SidebarTrigger,
+  SidebarProvider, SidebarScroll, SidebarSeparator, SidebarTrigger,
 };
