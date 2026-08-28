@@ -1,413 +1,310 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarClock,
+  CheckCircle2,
+  FileText,
+  Minus,
+  Package,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
+import { Segmented } from "@/components/Segmented";
+import { StatCard, StatRow } from "@/components/StatCard";
+import { ErrorTrend } from "@/components/ErrorTrend";
+import { CauseBreakdown } from "@/components/CauseBreakdown";
 import {
   Amount,
   Caption,
   FieldLabel,
   Figure,
-  Num,
+  FIGURE_SIZE,
 } from "@/components/ui/metric";
 import { useData } from "@/lib/data";
 import { useCurrency } from "@/lib/currency";
-import { n, plural } from "@/lib/format";
-import { agg, rowsFor, groupClaims, TYPES } from "@/lib/recovery";
+import { n, noDate, pct, plural } from "@/lib/format";
+import { agg } from "@/lib/recovery";
+import { byCause, causeOf } from "@/lib/causes";
+import {
+  monthlyErrorRate,
+  summarize,
+  windowPair,
+  TREND_DEFAULT,
+  TREND_WINDOWS,
+  type TrendWindow,
+} from "@/lib/trend";
 import { groupGoods, groupSummary } from "@/lib/group";
-import { chargeCoverage } from "@/lib/coverage";
+import { groupSuppliers } from "@/lib/suppliers";
 import { useMinAmount, splitByAmount } from "@/lib/threshold";
-// Én farge per kravtype, delt med tabellbadgene, tildelt etter type og aldri
-// etter rangering, slik at et filter aldri maler om de radene som blir igjen.
-import { KIND_COLOR } from "@/components/table/cells";
+import { cn } from "@/lib/utils";
 
 /**
- * Dashbordet svarer på ett spørsmål: hva gjør jeg nå?
+ * The dashboard is the status of the SERVICE, not a second copy of the pages.
  *
- * Alt som bare beskriver datagrunnlaget — utvikling over tid, avgifter per type,
- * leverandørlister, varetellinger — hører hjemme på sin egen side. Å gjenta det her
- * gjorde bare at det virkelige tallet druknet.
+ * Four questions, in this order, and nothing else: how much money have we found,
+ * is the overpayment getting better or worse, why is it happening, and does
+ * anything need doing right now. Everything that merely describes the import
+ * activity — declarations per month, import value, currencies, Incoterms,
+ * supplier rankings — belongs on the page that owns it. Repeating it here only
+ * drowned the one number that matters.
+ *
+ * Two money definitions would be one too many, so «sannsynlig» (probability
+ * weighted) is used everywhere on this page. The one deliberate exception is the
+ * trend, which counts every identified error regardless of the minimum-amount
+ * threshold, because «are we declaring correctly» is a different question from
+ * «what is worth claiming». The section says so out loud rather than quietly
+ * using a different set.
  */
 export function Dashboard() {
   const data = useData();
-  const { cur, convert } = useCurrency();
+  const { cur } = useCurrency();
   const ins = data.insights;
   const m = data.meta;
 
-  // Dashbordet regner på det som er verdt å hente, ikke på alt som finnes.
-  // Grensen deles med Refusjon-siden, så tallene her og der er samme utvalg.
+  // The threshold is shared with the Refusjon page, so the headline here and the
+  // list there always describe the same claims.
   const [minAmount] = useMinAmount();
   const split = React.useMemo(
     () => splitByAmount(ins.actions.rows, minAmount),
     [ins.actions.rows, minAmount],
   );
   const worth = split.material;
-
   const all = agg(worth);
-  const everything = agg(ins.actions.rows);
-  const sharePct =
-    everything.likely > 0
-      ? Math.round((all.likely / everything.likely) * 100)
-      : 0;
 
-  const byType = React.useMemo(
-    () =>
-      TYPES.filter((k) => k !== "alle")
-        .map((k) => ({ kind: k, ...agg(rowsFor(worth, k)) }))
-        .filter((t) => t.likely > 0)
-        .sort((a, b) => b.likely - a.likely),
+  const causes = React.useMemo(() => byCause(worth), [worth]);
+
+  const [months, setMonths] = React.useState<TrendWindow>(TREND_DEFAULT);
+  const series = React.useMemo(
+    () => monthlyErrorRate(ins.actions.rows, data.declarations),
+    [ins.actions.rows, data.declarations],
+  );
+  const { current, previous } = React.useMemo(
+    () => windowPair(series, months),
+    [series, months],
+  );
+  const now = summarize(current);
+  const before = previous ? summarize(previous) : null;
+  // Compared on the rounded values the reader can actually see: «opp fra 7,1 %»
+  // next to 7,1 % is a contradiction, not a nuance.
+  const direction =
+    before?.pct != null && now.pct != null
+      ? Math.round(now.pct * 10) - Math.round(before.pct * 10)
+      : null;
+
+  // What needs doing. Every item is a real link into the page that can act on it.
+  const soonest = React.useMemo(() => {
+    const days = worth
+      .map((r: any) => r.dager_igjen)
+      .filter((d: any) => d != null) as number[];
+    return days.length ? Math.min(...days) : null;
+  }, [worth]);
+  // Reclassification is the one finding that cannot be settled without the
+  // customer: Tolletaten needs the product specification to accept the new code.
+  // Same root-cause test as the chart uses — «mekanisme» is the agent's free text
+  // and misses a reclassification it happened to label «avtalesats».
+  const needsSpec = React.useMemo(
+    () => worth.filter((r: any) => causeOf(r) === "classification"),
     [worth],
   );
-  const mixTotal = byType.reduce((s, t) => s + t.likely, 0) || 1;
-
-  const groups = React.useMemo(() => groupClaims(worth), [worth]);
-  const soonest = React.useMemo(
-    () =>
-      groups
-        .filter((g) => g.dager_igjen != null && g.amount_nok > 0)
-        .sort((a, b) => a.dager_igjen! - b.dager_igjen!)
-        .slice(0, 6),
-    [groups],
-  );
-
   const goods = React.useMemo(
     () => groupSummary(groupGoods(data.goods)),
     [data.goods],
   );
-  const chargeCov = React.useMemo(
-    () => chargeCoverage(data.declarations),
+  const suppliers = React.useMemo(
+    () => groupSuppliers(data.declarations).length,
     [data.declarations],
   );
-  const assessedPct = ins.actions.count
-    ? Math.round((ins.actions.assessed / ins.actions.count) * 100)
-    : 0;
-  const belowCount = split.below.length;
-  const pctOfCeiling =
-    all.ceiling > 0
-      ? (v: number) => Math.min(100, (v / all.ceiling) * 100)
-      : () => 0;
+  const attention =
+    (all.urgentCount ? 1 : 0) +
+    (needsSpec.length ? 1 : 0) +
+    (goods.flagged ? 1 : 0);
 
   return (
     <>
-      {/* Tilstand, ikke ingress: hvem, hvilket vindu, hvilken frist. Sidenavnet
-          står i topplinjen, og «Se alle krav» lå her som appens eneste fylte
-          lg-knapp — samme lenke som «Alle krav →» under «Ta disse først». */}
-      <p className="text-sm text-muted-foreground">
-        Arnika AS · {m.claimWindow?.from} – {m.claimWindow?.to}. Fristen for
-        tilbakebetaling er 3 år fra fortollingsdato.
-      </p>
-
-      <Section
-        title="Verdt å hente"
-        description="«Sannsynlig» er tallet å planlegge etter. «Tak» forutsetter at absolutt alt går igjennom — det skjer ikke."
-      >
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-0">
-          <div className="lg:pr-10">
-            <Figure
-              size="display"
-              tone="positive"
-              value={<Amount nok={all.likely} />}
-              hint={
-                <>
-                  Sannsynlig refusjon fordelt på {n(all.count)} krav, vektet med
-                  vurdert sannsynlighet.
-                </>
-              }
-            />
-
-            <div className="mt-5 space-y-2">
-              <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-primary/12">
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-primary/45"
-                  style={{ width: `${pctOfCeiling(all.likely)}%` }}
-                />
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full bg-primary"
-                  style={{ width: `${pctOfCeiling(all.solid)}%` }}
-                />
-              </div>
-              <dl className="grid grid-cols-3 gap-3">
-                {[
-                  { k: "Solid grunnlag", v: all.solid, swatch: "bg-primary" },
-                  { k: "Sannsynlig", v: all.likely, swatch: "bg-primary/45" },
-                  { k: "Øvre tak", v: all.ceiling, swatch: "bg-primary/12" },
-                ].map((x) => (
-                  <div key={x.k}>
-                    <dt className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-                      <span
-                        className={`size-2 shrink-0 rounded-xxs ${x.swatch}`}
-                      />
-                      {x.k}
-                    </dt>
-                    <dd className="mt-1 text-sm font-medium tabnum">
-                      <Amount nok={x.v} />
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
-
-            {/* Det viktigste dashbordet kan si: hvor verdien faktisk ligger.
-                Uten dette ser 321 krav ut som 321 oppgaver — de er 42. */}
-            {belowCount > 0 && (
-              <p className="mt-6 border-t border-border-strong pt-5 text-sm leading-relaxed text-muted-foreground">
-                <span className="font-medium text-foreground">
-                  {n(all.count)} av {n(everything.count)} krav er over{" "}
-                  {n(minAmount)} kr
-                </span>{" "}
-                og utgjør{" "}
-                <span className="font-medium text-foreground tabnum">
-                  {sharePct} %
-                </span>{" "}
-                av verdien. De øvrige {n(belowCount)} er til sammen{" "}
+      {/* 1 — Hovedstatus. Ett tall, og det står alene i spalten sin. */}
+      <section className="grid grid-cols-12">
+        <div className="col-span-12 lg:col-span-7">
+          <Figure
+            size="display"
+            tone="positive"
+            label="Sannsynlig refusjon"
+            value={<Amount nok={all.likely} />}
+          />
+          <p className="t-lead mt-5">
+            {n(all.count)} krav er verdt å gå videre med.
+          </p>
+        </div>
+        <div className="col-span-12 lg:col-span-5 lg:border-l lg:border-border-strong lg:pl-10">
+          <p className="mt-3 max-w-[56ch] text-sm leading-relaxed text-muted-foreground">
+            Taket er{" "}
+            <span className="tabnum">
+              <Amount nok={all.ceiling} />
+            </span>
+            , og forutsetter at hvert eneste krav går igjennom.{" "}
+            {split.below.length > 0 && (
+              <>
+                {plural(split.below.length, "krav", "krav")} under{" "}
+                {n(minAmount)} kr står utenfor — til sammen{" "}
                 <span className="tabnum">
                   <Amount nok={split.belowValue} />
-                </span>{" "}
-                — mindre enn én omberegning koster å be om. Grensen justeres på{" "}
-                <Link
-                  to="/refusjon"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  Refusjon
-                </Link>
-                .
-              </p>
-            )}
-          </div>
-
-          <div className="lg:border-l lg:border-border-strong lg:pl-10">
-            <FieldLabel className="block">Fordelt på kravtype</FieldLabel>
-            <div className="mt-3.5 flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full">
-              {byType.map((t) => (
-                <div
-                  key={t.kind}
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${Math.max(3, (t.likely / mixTotal) * 100)}%`,
-                    background: KIND_COLOR[t.kind],
-                  }}
-                />
-              ))}
-            </div>
-            <ul className="mt-3.5 divide-y">
-              {byType.map((t) => (
-                <li key={t.kind}>
-                  <Link
-                    to={`/refusjon?type=${encodeURIComponent(t.kind)}`}
-                    className="flex items-center gap-3 py-2.5 transition-colors hover:text-primary"
-                  >
-                    <span
-                      className="size-2.5 shrink-0 rounded-xxs"
-                      style={{ background: KIND_COLOR[t.kind] }}
-                    />
-                    <span className="text-sm font-medium">{t.kind}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {n(t.count)} krav
-                    </span>
-                    <span className="ml-auto text-sm font-medium tabnum">
-                      <Amount nok={t.likely} />
-                    </span>
-                    <span className="w-10 shrink-0 text-right text-xs tabnum text-muted-foreground">
-                      {Math.round((t.likely / mixTotal) * 100)} %
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-
-            {/* Det som haster sto tidligere som fotnote under listen lenger nede,
-                der ingen så det. Her deler det plass med miksen og fyller spalten. */}
-            {all.urgentCount ? (
-              <Link
-                to="/refusjon?frist=haster"
-                className="mt-7 flex items-baseline gap-3 border-t border-border-strong pt-5 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <span className="text-3xl font-medium tabnum text-destructive">
-                  <Num value={all.urgentCount} />
                 </span>
-                <span className="min-w-0">
-                  <span className="block text-base font-medium">
-                    krav foreldes innen 90 dager
-                  </span>
-                  <span className="block text-sm text-muted-foreground">
-                    Et krav som foreldes er tapt. Vis bare disse →
-                  </span>
-                </span>
-              </Link>
-            ) : (
-              <p className="mt-7 border-t border-border-strong pt-5 text-sm text-muted-foreground">
-                Ingen krav foreldes de neste 90 dagene.
-              </p>
+                , og grensen justeres på Refusjon.
+              </>
             )}
-          </div>
-        </div>
-      </Section>
-
-      <Section
-        title="Ta disse først"
-        description="Kortest frist øverst. Et krav som foreldes er tapt."
-        action={
-          <Button asChild variant="ghost" size="sm" className="-mr-3">
+          </p>
+          <Button asChild variant="ghost" size="sm" className="-ml-3 mt-5">
             <Link to="/refusjon">
-              Alle krav
+              Se kravene
               <ArrowRight />
             </Link>
           </Button>
-        }
-      >
-        <ul className="divide-y">
-          {soonest.map((g) => (
-            <li key={g.key}>
-              <Link
-                to={`/refusjon?type=${encodeURIComponent(g.kind)}&q=${encodeURIComponent(g.produkt.slice(0, 24))}`}
-                className="flex items-center gap-3 py-2.5 transition-colors hover:bg-accent/40"
-              >
-                <span
-                  className={`w-14 shrink-0 text-sm tabnum ${g.dager_igjen! <= 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}
-                >
-                  {n(g.dager_igjen)} d
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {g.produkt || "—"}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {g.kind} · {g.aktor || "—"} ·{" "}
-                    {plural(g.tollnummers.length, "fortolling", "fortollinger")}
-                  </span>
-                </span>
-                <span className="shrink-0 text-sm font-medium tabnum">
-                  <Amount nok={g.amount_nok} />
-                </span>
-              </Link>
-            </li>
-          ))}
-          {!soonest.length && (
-            <li className="py-8 text-center text-sm text-muted-foreground">
-              Ingen krav med registrert frist.
-            </li>
-          )}
-        </ul>
-      </Section>
+        </div>
+      </section>
 
-      <Section
-        title="Grunnlaget"
-        description="Hvor mye av 3-årsvinduet som er dekket, og hvor mye av det som faktisk er kontrollert."
-      >
-        <div
-          className={
-            "grid gap-y-8 sm:grid-cols-2 lg:grid-cols-4 " +
-            "[&>*]:border-l [&>*]:border-border-strong [&>*]:pl-6 " +
-            "sm:[&>*:nth-child(2n+1)]:border-l-0 sm:[&>*:nth-child(2n+1)]:pl-0 " +
-            "lg:[&>*:nth-child(2n+1)]:border-l lg:[&>*:nth-child(2n+1)]:pl-6 " +
-            "lg:[&>*:nth-child(4n+1)]:border-l-0 lg:[&>*:nth-child(4n+1)]:pl-0"
+      {/* Her kommer status på refusjonssakene (Funnet → Klargjøres → Sendt inn →
+          Hos Tolletaten → Godkjent → Utbetalt) når saksoppfølgingen finnes.
+          Plassen er mellom hovedtallet og analysen med vilje: den forteller hva
+          som skjer med pengene over, ikke hva analysen fant. */}
+
+      <div className="grid grid-cols-12 gap-y-12">
+        {/* 2 — Utvikling over tid, kolonne 1–7. */}
+        <Section
+          className="col-span-12 lg:col-span-7 lg:pr-10"
+          title="Blir fortollingen riktigere?"
+          description="Andel av betalt toll og avgift som viste seg å være for mye, etter måneden fortollingen skjedde."
+          action={
+            <Segmented
+              label="Periode"
+              value={String(months)}
+              onChange={(v) => setMonths(Number(v) as TrendWindow)}
+              options={TREND_WINDOWS.map((w) => ({
+                value: String(w),
+                label: `${w} mnd`,
+              }))}
+            />
           }
         >
-          <div>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-muted-foreground">
-                Agent-vurderte krav
-              </span>
-              <span className="text-sm font-medium tabnum">
-                {n(ins.actions.assessed)} / {n(ins.actions.count)}
-              </span>
-            </div>
-            <Progress value={assessedPct} className="mt-2" />
-            <Caption className="mt-1.5">
-              Slått opp mot faktiske satser i tolltariffen. Resten hviler på
-              tekstheuristikk.
-            </Caption>
-          </div>
-
-          <div>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-muted-foreground">
-                Avgifter fordelt på type
-              </span>
-              <span className="text-sm font-medium tabnum">
-                {Math.round(chargeCov.pct)} %
-              </span>
-            </div>
-            <Progress value={chargeCov.pct} className="mt-2" />
-            <Caption className="mt-1.5">
-              <Amount nok={chargeCov.lineLevel} /> av{" "}
-              <Amount nok={chargeCov.declared} /> betalt er registrert per
-              varelinje.
-            </Caption>
-          </div>
-
-          <div>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-muted-foreground">
-                Deklarasjoner
-              </span>
-              <Link
-                to="/deklarasjoner"
-                className="text-sm font-medium tabnum hover:text-primary"
+          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+            <span className={cn(FIGURE_SIZE.lg, "tabnum")}>{pct(now.pct)}</span>
+            <span className="text-sm text-muted-foreground">
+              siste {now.months} mnd
+            </span>
+            {before?.pct != null && direction != null && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1.5 text-sm",
+                  direction < 0
+                    ? "text-success"
+                    : direction > 0
+                      ? "text-destructive"
+                      : "text-muted-foreground",
+                )}
               >
-                {n(m.declarations)}
-              </Link>
-            </div>
-            <div className="mt-2 space-y-1">
-              {(ins.coverage?.byYear ?? []).map((y: any) => {
-                const max = Math.max(
-                  1,
-                  ...ins.coverage.byYear.map((x: any) => x.n),
-                );
-                return (
-                  <div key={y.year} className="flex items-center gap-2">
-                    <span className="w-8 shrink-0 text-2xs tabnum text-muted-foreground">
-                      {y.year}
-                    </span>
-                    <span
-                      className="h-1.5 min-w-[3px] rounded-full bg-primary/70"
-                      style={{ width: `${(y.n / max) * 100}%` }}
-                    />
-                    <span className="ml-auto text-2xs tabnum text-muted-foreground">
-                      {n(y.n)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+                {direction < 0 ? (
+                  <TrendingDown className="size-3.5" aria-hidden />
+                ) : direction > 0 ? (
+                  <TrendingUp className="size-3.5" aria-hidden />
+                ) : (
+                  <Minus className="size-3.5" aria-hidden />
+                )}
+                {direction < 0 ? "ned" : direction > 0 ? "opp" : "uendret"} fra{" "}
+                {pct(before.pct)} forrige {before.months} mnd
+              </span>
+            )}
           </div>
 
-          <div>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-muted-foreground">Varer</span>
-              <Link
+          <ErrorTrend points={current} className="mt-6" />
+        </Section>
+
+        {/* 3 — Hvor pengene lekker, kolonne 8–12. */}
+        <Section
+          className="col-span-12 lg:col-span-5 lg:border-l lg:border-border-strong lg:pl-10"
+          title="Hvor pengene lekker"
+          description="Sannsynlig refusjon fordelt på årsaken til at det ble betalt for mye."
+        >
+          {/* Samme oppbygning som nabospalten — ett tall over diagrammet — så de
+              to seksjonene starter på samme linje og leses som ett oppslag.
+              Tallet er ANTALLET årsaker, ikke den største: andel og kroner står
+              allerede på hver søyle, og en linje som gjentar den øverste søylen
+              er ballast. Er lekkasjen samlet i tre mekanismer eller spredt over
+              ti? Det er det ingenting annet på siden som svarer på. */}
+          {causes.length > 0 && (
+            <p className="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+              <span className={cn(FIGURE_SIZE.lg, "tabnum")}>
+                {n(causes.length)}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {causes.length === 1 ? "årsak forklarer" : "årsaker forklarer"}{" "}
+                hele beløpet
+              </span>
+            </p>
+          )}
+
+          <CauseBreakdown slices={causes} className="mt-6" />
+        </Section>
+      </div>
+
+      {/* 4 — Krever oppmerksomhet, kolonne 1–12. */}
+      <Section
+        title="Krever oppmerksomhet"
+        description="Bare det som ikke kan vente. Hele kravlisten står på Refusjon."
+      >
+        {attention ? (
+          <StatRow cols={3}>
+            {all.urgentCount > 0 && (
+              <StatCard
+                label="Krav nærmer seg fristen"
+                icon={CalendarClock}
+                tone="risk"
+                value={n(all.urgentCount)}
+                hint={
+                  <>
+                    Korteste frist er {plural(soonest ?? 0, "dag", "dager")}. Et
+                    krav som foreldes er tapt.
+                  </>
+                }
+                to="/refusjon?frist=haster"
+              />
+            )}
+            {needsSpec.length > 0 && (
+              <StatCard
+                label="Krav venter på dokumentasjon"
+                icon={FileText}
+                tone="caution"
+                value={n(needsSpec.length)}
+                hint="Omtariffering må dokumenteres med produktspesifikasjon eller innholdsdeklarasjon fra dere."
+                to="/refusjon?type=Preferanse"
+              />
+            )}
+            {goods.flagged > 0 && (
+              <StatCard
+                label="Varer bør rettes"
+                icon={Package}
+                tone="caution"
+                value={n(goods.flagged)}
+                hint="Opplysningene spriker mellom sendinger og kan gi de samme feilene i fremtidige fortollinger."
                 to="/varer"
-                className="text-sm font-medium tabnum hover:text-primary"
-              >
-                {n(goods.groups)}
-              </Link>
-            </div>
-            <dl className="mt-2 space-y-1.5 text-xs">
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">Må rettes</dt>
-                <dd>
-                  <Badge variant={goods.flagged ? "destructive" : "secondary"}>
-                    {n(goods.flagged)}
-                  </Badge>
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">Merket variasjon</dt>
-                <dd className="tabnum text-muted-foreground">
-                  {n(goods.noted)}
-                </dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-2">
-                <dt className="text-muted-foreground">Varelinjer</dt>
-                <dd className="tabnum text-muted-foreground">
-                  {n(goods.lines)}
-                </dd>
-              </div>
-            </dl>
-          </div>
-        </div>
+              />
+            )}
+          </StatRow>
+        ) : (
+          <p className="flex items-start gap-2.5 text-base">
+            <CheckCircle2
+              className="mt-0.5 size-4 shrink-0 text-success"
+              aria-hidden
+            />
+            <span>
+              Du trenger ikke gjøre noe akkurat nå.{" "}
+              <span className="text-muted-foreground">
+                Ingen frister nærmer seg, og ingen krav venter på dokumentasjon
+                fra dere.
+              </span>
+            </span>
+          </p>
+        )}
       </Section>
 
       {cur !== "NOK" && (
@@ -417,5 +314,22 @@ export function Dashboard() {
         </Caption>
       )}
     </>
+  );
+}
+
+function SourceLink({
+  to,
+  children,
+}: {
+  to: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      className="rounded-sm underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      {children}
+    </Link>
   );
 }

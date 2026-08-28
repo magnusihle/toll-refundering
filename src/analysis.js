@@ -610,8 +610,13 @@ export function raakReconciliation({ win = claimWindow() } = {}) {
 // written summary and a concrete next step, for review/export and handoff to DSV.
 export function actionList(pref, raak, prod) {
   const rows = [];
-  for (const r of pref.items) rows.push({ kind: 'Preferanse', linje: r.item_number, tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, likelihood: r.likelihood, reasoning: r.reasoning, claim_draft: r.claim_draft, mekanisme: r.mekanisme, bku: r.bku });
-  for (const r of raak.items) rows.push({ kind: 'RÅK', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.confidence, amount_nok: r.est_overpay, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action });
+  // hs_code + foreslatt_hs følger med fordi ROTÅRSAKEN henger på om agenten
+  // foreslo et ANNET varenummer. Feil varenummer gir feil sats, så uten dette
+  // paret kan en feilklassifisering ikke skilles fra en ren satsfeil — man ser
+  // bare symptomet. `mekanisme` er agentens fritekst og duger ikke: den skiller
+  // ikke nivåene (se web/src/lib/causes.ts).
+  for (const r of pref.items) rows.push({ kind: 'Preferanse', linje: r.item_number, tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, likelihood: r.likelihood, reasoning: r.reasoning, claim_draft: r.claim_draft, mekanisme: r.mekanisme, hs_code: r.hs_code, foreslatt_hs: r.verdict ? r.verdict.foreslatt_hs : null, bku: r.bku });
+  for (const r of raak.items) rows.push({ kind: 'RÅK', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.confidence, amount_nok: r.est_overpay, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, hs_code: r.hs_code, foreslatt_hs: null });
   for (const r of prod.items) rows.push({ kind: 'Produkt', tollnummer: (r.tollnummers || [])[0], godkjent: null, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: 'info', amount_nok: r.est_vat_overpay, frist: null, dager_igjen: null, summary: r.summary, action: r.action });
   rows.sort((a, b) => (b.amount_nok || 0) - (a.amount_nok || 0));
   // Hvert krav trenger en STABIL id. Uten den kan ikke frontend la brukeren

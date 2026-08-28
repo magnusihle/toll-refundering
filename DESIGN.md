@@ -398,6 +398,80 @@ vilkårlig lengde ser ut som en feil.
 **Badges er små markører**, ikke fargede piller: 4px radius, hårfin kant, dempet
 flate. Kun statusvariantene har prikk foran teksten.
 
+**Alle diagrammer er shadcn-diagrammer.** Grunnlaget er
+`ui/chart.tsx` fra shadcn-registeret (`new-york`, Recharts 2.15) — ikke
+håndtegnet SVG per side. Et diagram som er bygget for seg selv blir aldri helt
+likt naboen, og forskjellene samler seg: én akse med egne tikk, én tooltip som
+ligner den andre uten å være den. Et nytt diagram skal være en `config` og en
+Recharts-serie, ikke en ny bunke SVG.
+
+*Historikk:* dashbordets to første diagram ble tegnet for hånd fordi «én linje og
+et titalls punkter forsvarer ikke en avhengighet». Magnus snudde 2026-08-28:
+konsistens på tvers av appen er verdt de ~110 kB. Argumentet holdt for ÉN side og
+falt på den andre.
+
+Avvikene fra shadcn er bare hud, og alle står i denne filen: avlesningen er en
+popover-flate med `shadow-overlay` på popover-radius, tall står i `.tabnum` i
+appens egen stack (aldri mono), swatch-radius er `rounded-xxs`. `item.value &&`
+ble `item.value != null`, fordi en 0 %-måned er en verdi og oppstrøms slukte den
+i stillhet. `ChartTooltipPanel` og `ChartTooltipRow` er eksportert, slik at et
+diagram med egne rader maler SAMME boks — ikke en som ligner.
+
+**Alle diagram er like høye.** `CHART_HEIGHT` i `ui/chart.tsx`, og den er en fast
+høyde, ikke et sideforhold: diagrammene står i spalter av ulik bredde, og et
+sideforhold ville gjort det smale diagrammet lavt. To diagram side om side med
+ulik høyde leser som en feil, ikke som en layout.
+
+**Seriefarger kommer fra `--chart-1..3` gjennom `config`** — aldri fra en
+Tailwind-palett. Ett måltall på tvers av kategorier er ÉN farge: lengden er
+sammenligningen, og en farge nummer to ville påstått at søylene tilhører hver sin
+serie.
+
+**Ingen innfyllingsanimasjon.** Recharts sveiper serien inn over 1,5 s. Det er
+langt utenfor bevegelsesbudsjettet, og `requestAnimationFrame` struper i en
+bakgrunnsfane — laster du dashbordet i en fane du ikke ser på, kommer du tilbake
+til et diagram som står frosset halvtegnet. `isAnimationActive={false}`.
+
+**Et diagram skal kunne nås uten mus.** `accessibilityLayer` på diagrammet gir
+fokus og piltaster; avlesningen følger etter, og tallene ligger dessuten som
+`sr-only`-liste under diagrammet. Den som ikke ser grafen skal kunne lese tallene
+— ikke få vite at det finnes en graf.
+
+**En søyle bærer navn, andel og kroner på ÉN linje over søylen:**
+«Feil klassifisering — 34 % · 22 261 NOK». Andel og kroner svarer på hvert sitt
+spørsmål (hvor stor del av problemet, og hva er det verdt), og ingen av dem skal
+kreve hover. Over søylen, ikke inni: navnet er svaret på spørsmålet seksjonen
+stiller og skal aldri forkortes, og et fylt felt med lys tekst i leser som en
+knapp.
+
+## Årsak, ikke symptom
+
+En årsaksfordeling må være gjensidig utelukkende, ellers summerer den en årsak og
+dens egen konsekvens. Første versjon av «Hvor pengene lekker» hadde «feil
+vareklassifisering» og «feil tollsats» som to søyler — men feil varenummer er
+nettopp det som GIR feil sats. Magnus tok den 2026-08-28.
+
+Løsningen er en RANGERING, ikke penere ord. Hvert krav havner under det FØRSTE
+som treffer, så bøttene er utelukkende av konstruksjon:
+
+1. innvilget tollnedsettelse gjaldt på fortollingsdagen og ble ikke brukt
+2. agenten foreslår et ANNET varenummer → feil klassifisering
+3. preferanse ble aldri krevd
+4. varenummeret står, satsen som ble brukt gjaldt ikke
+
+Skillet på punkt 2 er `foreslatt_hs` mot deklarert `hs_code`, sammenlignet på
+sifre alene — to lagrede felt, ikke agentens fritekst `mekanisme`. Fritekstet
+holder ikke nivåene fra hverandre: av 14 krav merket `feil_sats` foreslår 13
+ikke noe nytt varenummer i det hele tatt, mens ett merket `avtalesats` foreslår
+et annet nummer og ER en omklassifisering.
+
+**Ikke tving frem en kategori datamodellen ikke bærer.** «Feil grunnlag/verdi»
+finnes i grunnlaget — noen dommer beskriver toll regnet ad valorem der tariffen
+setter kr/kg — men det står bare i agentens prosa, og `foreslatt_sats` kan ikke
+skille 0 kr/kg fra 0 %. Da blir det inne i «feil sats på riktig varenummer» til
+en vurderingsrunde skriver en LUKKET mekanismeliste. En gjetning i kategoriens
+klær er verre enn én bøtte for mye.
+
 **Sidebaren** bærer ordmerket «Declaro.» (DESIGN.md — aldri et oppfunnet symbol),
 gruppetitler som eyebrows, og aktiv rad markert med en strek i margen.
 

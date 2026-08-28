@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { cn } from '@/lib/utils';
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
 /**
  * En seksjon er ÅPEN, ikke et kort.
@@ -16,7 +16,13 @@ import { cn } from '@/lib/utils';
  * slik at et bart element på en side får nøyaktig samme rytme som en seksjon.
  */
 export function Section({
-  title, description, action, children, className, bodyClassName, footer,
+  title,
+  description,
+  action,
+  children,
+  className,
+  bodyClassName,
+  footer,
 }: {
   title?: React.ReactNode;
   description?: React.ReactNode;
@@ -32,14 +38,26 @@ export function Section({
         <div className="flex flex-col gap-3 md:flex-row md:items-baseline md:justify-between md:gap-8">
           <div className="min-w-0 md:max-w-[78ch]">
             {title ? <h2 className="t-section">{title}</h2> : null}
-            {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
+            {description ? (
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {description}
+              </p>
+            ) : null}
           </div>
-          {action ? <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">{action}</div> : null}
+          {action ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
+              {action}
+            </div>
+          ) : null}
         </div>
       )}
-      <div className={cn(title || action ? 'mt-5' : undefined, bodyClassName)}>{children}</div>
+      <div className={cn(title || action ? "mt-5" : undefined, bodyClassName)}>
+        {children}
+      </div>
       {footer ? (
-        <div className="t-small mt-7 border-t border-border-strong pt-3.5 text-muted-foreground">{footer}</div>
+        <div className="t-small mt-7 border-t border-border-strong pt-3.5 text-muted-foreground">
+          {footer}
+        </div>
       ) : null}
     </section>
   );
