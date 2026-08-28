@@ -10,7 +10,8 @@ import { useParam } from '@/lib/filters';
  * Med grensen på 500 kr står 42 linjer igjen som holder 94 % av verdien.
  *
  * Grensen er et VISNINGSFILTER, aldri en sletting: alt som faller under vises
- * som antall og beløp der det filtreres, og kan slås av med ett klikk.
+ * som antall og beløp i nøkkeltallsraden, side om side med det som er igjen,
+ * og slås av i Minstebeløp-velgeren.
  *
  * Verdien ligger i URL-en (delbar lenke, overlever refresh) med localStorage som
  * fallback, slik at valget følger brukeren mellom sider og økter.

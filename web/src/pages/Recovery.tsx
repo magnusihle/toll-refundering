@@ -10,6 +10,7 @@ import {
 import {
   Download,
   CalendarClock,
+  Filter,
   HandCoins,
   Mail,
   ShieldCheck,
@@ -135,7 +136,7 @@ export function Recovery() {
   );
   // Minstebeløpet gjelder HELE siden, som hasterfilteret: tellere, beløp og
   // eksport skal alltid handle om det utvalget man faktisk ser på.
-  const [minAmount, setMinAmount] = useMinAmount();
+  const [minAmount] = useMinAmount();
   const split = React.useMemo(
     () => splitByAmount(baseRows, minAmount),
     [baseRows, minAmount],
@@ -923,7 +924,7 @@ export function Recovery() {
       {/* Tallene beskriver DET DATASETTET SOM VISES. Sto tidligere fast på
           kravtallene, så «Ikke grunnlag» viste 189 rader under «65 545 NOK ·
           42 krav» — tall og tabell fra to ulike verdener. */}
-      <StatRow cols={3}>
+      <StatRow cols={split.below.length > 0 ? 4 : 3}>
         <StatCard
           label="Sannsynlig refusjon"
           tone="positive"
@@ -945,6 +946,25 @@ export function Recovery() {
             </>
           }
         />
+        {/* What the threshold holds back is counted where the numbers are, not
+            in a footnote below them. This column deliberately does nothing on
+            click: the way back is the Minstebeløp control in the filter row
+            just below, and a clickable number in a row of three that are not
+            reads as a different kind of thing than it is. */}
+        {split.below.length > 0 && (
+          <StatCard
+            label={`Under grensen — ${n(minAmount)} kr`}
+            icon={Filter}
+            tone="muted"
+            value={<Amount nok={split.belowValue} />}
+            hint={
+              <>
+                {n(split.below.length)} krav, for{" "}
+                {split.below.length === 1 ? "lite" : "små"} til å lønne seg.
+              </>
+            }
+          />
+        )}
         <StatCard
           label="Haster — frist ≤ 90 dager"
           icon={CalendarClock}
@@ -953,25 +973,6 @@ export function Recovery() {
           hint={<>Av {n(a.count)} krav i utvalget.</>}
         />
       </StatRow>
-
-      {split.below.length > 0 && (
-        <p className="text-sm text-muted-foreground">
-          {n(split.below.length)} krav under {n(minAmount)} kr er utelatt — til
-          sammen{" "}
-          <span className="tabnum">
-            <Amount nok={split.belowValue} />
-          </span>
-          . Hver fortolling må omberegnes for seg, så småkrav koster mer å hente
-          enn de gir.{" "}
-          <button
-            type="button"
-            onClick={() => setMinAmount(0)}
-            className="rounded-sm text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Vis dem likevel
-          </button>
-        </p>
-      )}
 
       <TableSection
         title={kind === "alle" ? "Alle krav" : `${kind}-krav`}
