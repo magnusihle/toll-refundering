@@ -9,6 +9,38 @@ import { claimWindow, claimDeadline } from './period.js';
 // Assemble the API payload the React dashboard renders from. All money is NOK
 // (customs computes in NOK); value_nok is the customs value (summed MVA-grunnlag)
 // per declaration so multi-currency invoices become comparable without any FX.
+/**
+ * The shape contract between a published snapshot and the app that renders it.
+ *
+ * Prod does not compute anything: it serves one frozen payload that `publish`
+ * pushes from the local base, while the frontend deploys on its own schedule
+ * from git. The two therefore drift, and the drift is silent — a field the app
+ * started reading is simply `undefined` in an older payload, and the number it
+ * feeds is wrong rather than missing. That already happened once: the 20 Aug
+ * snapshot predated `hs_code`/`foreslatt_hs` on claim rows, so every
+ * misclassification fell through to «feil sats» and the dashboard showed two
+ * causes where there were three, with no sign anything was off.
+ *
+ * Bump this whenever the payload gains a field the app relies on, and raise
+ * REQUIRED_CONTRACT in web/src/lib/contract.ts in the same commit. The app then
+ * says so on screen instead of quietly misreporting.
+ *
+ *   1  everything up to 2026-08-20
+ *   2  claim rows carry id, linje, hs_code, foreslatt_hs — the root cause of a
+ *      claim and the stable identity a selection needs
+ */
+export const SNAPSHOT_CONTRACT = 2;
+
+// Which commit built the payload. Costs nothing and turns «why does prod differ
+// from local?» into one glance instead of an investigation.
+function gitCommit() {
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim();
+  } catch {
+    return null;
+  }
+}
+
 export function dashboardData() {
   const d = getDb();
   const decls = d.prepare('SELECT * FROM declarations ORDER BY godkjent_iso DESC, tollnummer').all();
@@ -34,6 +66,8 @@ export function dashboardData() {
   const win = claimWindow();
   const meta = {
     generatedAt: new Date().toISOString(),
+    contract: SNAPSHOT_CONTRACT,
+    commit: gitCommit(),
     // 3-årsfristen for tilbakebetaling, regnet i norsk tid
     claimWindow: win,
     inWindow: declarations.filter((x) => x.godkjent_iso && x.godkjent_iso >= win.from && x.godkjent_iso <= win.to).length,

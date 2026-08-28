@@ -26,7 +26,7 @@ try {
     console.log(JSON.stringify({ report }, null, 2));
     await closeSession();
   } else if (cmd === 'insights') { console.log(JSON.stringify(insights(), null, 2)); }
-  else if (cmd === 'publish') { const r = await publish(); console.log(`Publisert til prod: ${r.declarations} deklarasjoner, ${r.goodsLines} varelinjer, ${(r.bytes/1024/1024).toFixed(1)} MB · ${r.updatedAt}`); }
+  else if (cmd === 'publish') { const r = await publish(); console.log(`Publisert til prod: ${r.declarations} deklarasjoner, ${r.goodsLines} varelinjer, ${(r.bytes/1024/1024).toFixed(1)} MB · ${r.updatedAt}`); process.exit(0); }
   else if (cmd === 'window') { console.log(JSON.stringify(claimWindow(), null, 2)); }
   else if (cmd === 'serve') {
     const { url } = await serve(a ? Number(a) : 8899); // serve() builds web/dist if needed
