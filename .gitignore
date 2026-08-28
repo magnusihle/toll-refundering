@@ -1,21 +1,35 @@
+# Dependencies
 node_modules/
-.env
-.session/
-data/*.csv
-data/*.json
-# ...men agentdommene er uerstattelige (dyre agentkjøringer) og ikke hemmelige —
-# de SKAL versjoneres, ellers finnes de bare på én laptop.
-!data/pref-verdicts.json
-!data/raak-verdicts.json
-*.log
-data/sad/
-data/emma.db*
-dashboard/index.html
 web/node_modules/
+
+# Build output
 web/dist/
-data/fx-cache.json
-.DS_Store
+dashboard/index.html
+
+# Secrets and local environment
+.env*
+!.env.example
+.session/
 .vercel/
 api/_data/auth-schema.sql
-.vercel
-.env*
+
+# Local data, caches and databases
+data/*.csv
+data/*.json
+data/sad/
+data/emma.db*
+# ...but the agent verdicts are irreplaceable (expensive agent runs) and are
+# not secret - they MUST be versioned, or they exist on one laptop only.
+!data/pref-verdicts.json
+!data/raak-verdicts.json
+
+# Logs
+*.log
+
+# Editor and OS noise
+.DS_Store
+
+# Claude Code: machine-local settings and third-party skills stay local.
+# Project instructions (CLAUDE.md, DESIGN.md) are versioned.
+.claude/settings.local.json
+.claude/skills/
