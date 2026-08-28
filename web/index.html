@@ -3,7 +3,70 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EMMA EDOC — Fortollingsanalyse</title>
+
+    <!--
+      Merkevaren er den samme som declaro.no.
+
+      `icon.svg` og `social/declaro-og-v3.png` er BYTEIDENTISKE kopier fra
+      website-repoet (`app/icon.svg` og `public/social/declaro-og-v3.png`), ikke
+      gjenskapninger. En lenke til appen skal forhåndsvises nøyaktig som en lenke
+      til nettsiden — samme merke, samme bilde, samme stemme. Endres de der, skal
+      de kopieres hit på nytt.
+
+      Tittelen følger nettsidens mønster «%s – Declaro» og settes per side i
+      `components/layout/Layout.tsx`. Denne er startverdien før React har montert
+      og fallbacken hvis JavaScript aldri kjører.
+    -->
+    <title>Declaro</title>
+    <meta
+      name="description"
+      content="Declaro gjennomgår tolldeklarasjonene, finner feilene og henter pengene tilbake."
+    />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+
+    <!--
+      Appen er innlogget og skal ALDRI indekseres — nettsiden er den offentlige
+      flaten. `noindex` stopper søkemotorer, men ikke Slack, iMessage og LinkedIn:
+      de leser og forhåndsviser og-taggene under. Derfor virker begge deler.
+    -->
+    <meta name="robots" content="noindex, nofollow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="nb_NO" />
+    <meta property="og:site_name" content="Declaro" />
+    <meta property="og:title" content="Declaro – tollrefusjon" />
+    <meta
+      property="og:description"
+      content="Declaro gjennomgår tolldeklarasjonene, finner feilene og henter pengene tilbake."
+    />
+    <meta property="og:image" content="/social/declaro-og-v3.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Illustrasjon av importvarer, tolldeklarasjoner og et ryddig arkiv."
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Declaro – tollrefusjon" />
+    <meta
+      name="twitter:description"
+      content="Declaro gjennomgår tolldeklarasjonene, finner feilene og henter pengene tilbake."
+    />
+    <meta name="twitter:image" content="/social/declaro-og-v3.png" />
+    <meta
+      name="twitter:image:alt"
+      content="Illustrasjon av importvarer, tolldeklarasjoner og et ryddig arkiv."
+    />
+
+    <!--
+      Nettleserkromet på mobil tar fargen fra siden. Verdiene er canvas og
+      background fra paletten i index.css — ingen nye farger, og sidebaren er
+      forest i begge moduser uansett.
+    -->
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F7F4ED" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#101A15" />
   </head>
   <body>
     <div id="root"></div>

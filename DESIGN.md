@@ -472,6 +472,32 @@ skille 0 kr/kg fra 0 %. Da blir det inne i «feil sats på riktig varenummer» t
 en vurderingsrunde skriver en LUKKET mekanismeliste. En gjetning i kategoriens
 klær er verre enn én bøtte for mye.
 
+## Merkevareressurser deles med nettsiden
+
+En lenke til appen skal forhåndsvises nøyaktig som en lenke til declaro.no —
+samme merke, samme bilde, samme stemme. Derfor er filene KOPIER, ikke
+gjenskapninger:
+
+| Her | Fra `Documents/Declaro/website` |
+|---|---|
+| `web/public/icon.svg` | `app/icon.svg` |
+| `web/public/social/declaro-og-v3.png` | `public/social/declaro-og-v3.png` |
+
+De skal være byteidentiske. Endres de i website-repoet, kopieres de hit på nytt —
+ikke tegn dem på nytt, og ikke lag en «app-variant». Tittelen følger nettsidens
+mønster «%s – Declaro» og settes per side i `layout/Layout.tsx`.
+
+To ting skiller seg fra nettsiden, med vilje:
+
+- **Appen er `noindex, nofollow`.** Den er innlogget; nettsiden er den
+  offentlige flaten. Det stopper søkemotorer, men ikke Slack, iMessage og
+  LinkedIn — de leser og-taggene og forhåndsviser som før.
+- **`og:image` må være ABSOLUTT.** Unfurlere dropper en relativ sti uten å si
+  fra, og lenken previewer som naken URL. Domenet er bare kjent ved deploy, så
+  `vite.config.ts` stempler inn origin fra `BETTER_AUTH_URL` (samme variabel som
+  auth allerede krever — ikke en ny å holde synkronisert) og advarer høyt i
+  bygget hvis den mangler.
+
 **Sidebaren** bærer ordmerket «Declaro.» (DESIGN.md — aldri et oppfunnet symbol),
 gruppetitler som eyebrows, og aktiv rad markert med en strek i margen.
 
