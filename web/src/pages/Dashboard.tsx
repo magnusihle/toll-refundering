@@ -1,21 +1,27 @@
-import * as React from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Section } from '@/components/ui/section';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { Amount, Caption, FieldLabel, Figure, Num } from '@/components/ui/metric';
-import { useData } from '@/lib/data';
-import { useCurrency } from '@/lib/currency';
-import { n, plural } from '@/lib/format';
-import { agg, rowsFor, groupClaims, TYPES } from '@/lib/recovery';
-import { groupGoods, groupSummary } from '@/lib/group';
-import { chargeCoverage } from '@/lib/coverage';
-import { useMinAmount, splitByAmount } from '@/lib/threshold';
+import * as React from "react";
+import { Link } from "react-router-dom";
+import { ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Section } from "@/components/ui/section";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import {
+  Amount,
+  Caption,
+  FieldLabel,
+  Figure,
+  Num,
+} from "@/components/ui/metric";
+import { useData } from "@/lib/data";
+import { useCurrency } from "@/lib/currency";
+import { n, plural } from "@/lib/format";
+import { agg, rowsFor, groupClaims, TYPES } from "@/lib/recovery";
+import { groupGoods, groupSummary } from "@/lib/group";
+import { chargeCoverage } from "@/lib/coverage";
+import { useMinAmount, splitByAmount } from "@/lib/threshold";
 // Én farge per kravtype, delt med tabellbadgene, tildelt etter type og aldri
 // etter rangering, slik at et filter aldri maler om de radene som blir igjen.
-import { KIND_COLOR } from '@/components/table/cells';
+import { KIND_COLOR } from "@/components/table/cells";
 
 /**
  * Dashbordet svarer på ett spørsmål: hva gjør jeg nå?
@@ -33,35 +39,55 @@ export function Dashboard() {
   // Dashbordet regner på det som er verdt å hente, ikke på alt som finnes.
   // Grensen deles med Refusjon-siden, så tallene her og der er samme utvalg.
   const [minAmount] = useMinAmount();
-  const split = React.useMemo(() => splitByAmount(ins.actions.rows, minAmount), [ins.actions.rows, minAmount]);
+  const split = React.useMemo(
+    () => splitByAmount(ins.actions.rows, minAmount),
+    [ins.actions.rows, minAmount],
+  );
   const worth = split.material;
 
   const all = agg(worth);
   const everything = agg(ins.actions.rows);
-  const sharePct = everything.likely > 0 ? Math.round((all.likely / everything.likely) * 100) : 0;
+  const sharePct =
+    everything.likely > 0
+      ? Math.round((all.likely / everything.likely) * 100)
+      : 0;
 
   const byType = React.useMemo(
-    () => TYPES.filter((k) => k !== 'alle')
-      .map((k) => ({ kind: k, ...agg(rowsFor(worth, k)) }))
-      .filter((t) => t.likely > 0)
-      .sort((a, b) => b.likely - a.likely),
-    [worth]
+    () =>
+      TYPES.filter((k) => k !== "alle")
+        .map((k) => ({ kind: k, ...agg(rowsFor(worth, k)) }))
+        .filter((t) => t.likely > 0)
+        .sort((a, b) => b.likely - a.likely),
+    [worth],
   );
   const mixTotal = byType.reduce((s, t) => s + t.likely, 0) || 1;
 
   const groups = React.useMemo(() => groupClaims(worth), [worth]);
   const soonest = React.useMemo(
-    () => groups.filter((g) => g.dager_igjen != null && g.amount_nok > 0)
-      .sort((a, b) => a.dager_igjen! - b.dager_igjen!)
-      .slice(0, 6),
-    [groups]
+    () =>
+      groups
+        .filter((g) => g.dager_igjen != null && g.amount_nok > 0)
+        .sort((a, b) => a.dager_igjen! - b.dager_igjen!)
+        .slice(0, 6),
+    [groups],
   );
 
-  const goods = React.useMemo(() => groupSummary(groupGoods(data.goods)), [data.goods]);
-  const chargeCov = React.useMemo(() => chargeCoverage(data.declarations), [data.declarations]);
-  const assessedPct = ins.actions.count ? Math.round((ins.actions.assessed / ins.actions.count) * 100) : 0;
+  const goods = React.useMemo(
+    () => groupSummary(groupGoods(data.goods)),
+    [data.goods],
+  );
+  const chargeCov = React.useMemo(
+    () => chargeCoverage(data.declarations),
+    [data.declarations],
+  );
+  const assessedPct = ins.actions.count
+    ? Math.round((ins.actions.assessed / ins.actions.count) * 100)
+    : 0;
   const belowCount = split.below.length;
-  const pctOfCeiling = all.ceiling > 0 ? (v: number) => Math.min(100, (v / all.ceiling) * 100) : () => 0;
+  const pctOfCeiling =
+    all.ceiling > 0
+      ? (v: number) => Math.min(100, (v / all.ceiling) * 100)
+      : () => 0;
 
   return (
     <>
@@ -69,7 +95,8 @@ export function Dashboard() {
           står i topplinjen, og «Se alle krav» lå her som appens eneste fylte
           lg-knapp — samme lenke som «Alle krav →» under «Ta disse først». */}
       <p className="text-sm text-muted-foreground">
-        Arnika AS · {m.claimWindow?.from} – {m.claimWindow?.to}. Fristen for tilbakebetaling er 3 år fra fortollingsdato.
+        Arnika AS · {m.claimWindow?.from} – {m.claimWindow?.to}. Fristen for
+        tilbakebetaling er 3 år fra fortollingsdato.
       </p>
 
       <Section
@@ -82,25 +109,41 @@ export function Dashboard() {
               size="display"
               tone="positive"
               value={<Amount nok={all.likely} />}
-              hint={<>Sannsynlig gjenvinning fordelt på {n(all.count)} krav, vektet med vurdert sannsynlighet.</>}
+              hint={
+                <>
+                  Sannsynlig refusjon fordelt på {n(all.count)} krav, vektet med
+                  vurdert sannsynlighet.
+                </>
+              }
             />
 
             <div className="mt-5 space-y-2">
               <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-primary/12">
-                <div className="absolute inset-y-0 left-0 rounded-full bg-primary/45" style={{ width: `${pctOfCeiling(all.likely)}%` }} />
-                <div className="absolute inset-y-0 left-0 rounded-full bg-primary" style={{ width: `${pctOfCeiling(all.solid)}%` }} />
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-primary/45"
+                  style={{ width: `${pctOfCeiling(all.likely)}%` }}
+                />
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                  style={{ width: `${pctOfCeiling(all.solid)}%` }}
+                />
               </div>
               <dl className="grid grid-cols-3 gap-3">
                 {[
-                  { k: 'Solid grunnlag', v: all.solid, swatch: 'bg-primary' },
-                  { k: 'Sannsynlig', v: all.likely, swatch: 'bg-primary/45' },
-                  { k: 'Øvre tak', v: all.ceiling, swatch: 'bg-primary/12' },
+                  { k: "Solid grunnlag", v: all.solid, swatch: "bg-primary" },
+                  { k: "Sannsynlig", v: all.likely, swatch: "bg-primary/45" },
+                  { k: "Øvre tak", v: all.ceiling, swatch: "bg-primary/12" },
                 ].map((x) => (
                   <div key={x.k}>
                     <dt className="flex items-center gap-1.5 text-2xs text-muted-foreground">
-                      <span className={`size-2 shrink-0 rounded-xxs ${x.swatch}`} />{x.k}
+                      <span
+                        className={`size-2 shrink-0 rounded-xxs ${x.swatch}`}
+                      />
+                      {x.k}
                     </dt>
-                    <dd className="mt-1 text-sm font-medium tabnum"><Amount nok={x.v} /></dd>
+                    <dd className="mt-1 text-sm font-medium tabnum">
+                      <Amount nok={x.v} />
+                    </dd>
                   </div>
                 ))}
               </dl>
@@ -111,12 +154,25 @@ export function Dashboard() {
             {belowCount > 0 && (
               <p className="mt-6 border-t border-border-strong pt-5 text-sm leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">
-                  {n(all.count)} av {n(everything.count)} krav er over {n(minAmount)} kr
-                </span>{' '}
-                og utgjør <span className="font-medium text-foreground tabnum">{sharePct} %</span> av verdien.
-                De øvrige {n(belowCount)} er til sammen <span className="tabnum"><Amount nok={split.belowValue} /></span> —
-                mindre enn én omberegning koster å be om. Grensen justeres på{' '}
-                <Link to="/gjenvinning" className="text-primary underline-offset-4 hover:underline">Refusjon</Link>.
+                  {n(all.count)} av {n(everything.count)} krav er over{" "}
+                  {n(minAmount)} kr
+                </span>{" "}
+                og utgjør{" "}
+                <span className="font-medium text-foreground tabnum">
+                  {sharePct} %
+                </span>{" "}
+                av verdien. De øvrige {n(belowCount)} er til sammen{" "}
+                <span className="tabnum">
+                  <Amount nok={split.belowValue} />
+                </span>{" "}
+                — mindre enn én omberegning koster å be om. Grensen justeres på{" "}
+                <Link
+                  to="/refusjon"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Refusjon
+                </Link>
+                .
               </p>
             )}
           </div>
@@ -128,7 +184,10 @@ export function Dashboard() {
                 <div
                   key={t.kind}
                   className="h-full rounded-full"
-                  style={{ width: `${Math.max(3, (t.likely / mixTotal) * 100)}%`, background: KIND_COLOR[t.kind] }}
+                  style={{
+                    width: `${Math.max(3, (t.likely / mixTotal) * 100)}%`,
+                    background: KIND_COLOR[t.kind],
+                  }}
                 />
               ))}
             </div>
@@ -136,13 +195,20 @@ export function Dashboard() {
               {byType.map((t) => (
                 <li key={t.kind}>
                   <Link
-                    to={`/gjenvinning?type=${encodeURIComponent(t.kind)}`}
+                    to={`/refusjon?type=${encodeURIComponent(t.kind)}`}
                     className="flex items-center gap-3 py-2.5 transition-colors hover:text-primary"
                   >
-                    <span className="size-2.5 shrink-0 rounded-xxs" style={{ background: KIND_COLOR[t.kind] }} />
+                    <span
+                      className="size-2.5 shrink-0 rounded-xxs"
+                      style={{ background: KIND_COLOR[t.kind] }}
+                    />
                     <span className="text-sm font-medium">{t.kind}</span>
-                    <span className="text-xs text-muted-foreground">{n(t.count)} krav</span>
-                    <span className="ml-auto text-sm font-medium tabnum"><Amount nok={t.likely} /></span>
+                    <span className="text-xs text-muted-foreground">
+                      {n(t.count)} krav
+                    </span>
+                    <span className="ml-auto text-sm font-medium tabnum">
+                      <Amount nok={t.likely} />
+                    </span>
                     <span className="w-10 shrink-0 text-right text-xs tabnum text-muted-foreground">
                       {Math.round((t.likely / mixTotal) * 100)} %
                     </span>
@@ -155,10 +221,12 @@ export function Dashboard() {
                 der ingen så det. Her deler det plass med miksen og fyller spalten. */}
             {all.urgentCount ? (
               <Link
-                to="/gjenvinning?frist=haster"
+                to="/refusjon?frist=haster"
                 className="mt-7 flex items-baseline gap-3 border-t border-border-strong pt-5 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
-                <span className="text-3xl font-medium tabnum text-destructive"><Num value={all.urgentCount} /></span>
+                <span className="text-3xl font-medium tabnum text-destructive">
+                  <Num value={all.urgentCount} />
+                </span>
                 <span className="min-w-0">
                   <span className="block text-base font-medium">
                     krav foreldes innen 90 dager
@@ -180,29 +248,47 @@ export function Dashboard() {
       <Section
         title="Ta disse først"
         description="Kortest frist øverst. Et krav som foreldes er tapt."
-        action={<Button asChild variant="ghost" size="sm" className="-mr-3"><Link to="/gjenvinning">Alle krav<ArrowRight /></Link></Button>}
+        action={
+          <Button asChild variant="ghost" size="sm" className="-mr-3">
+            <Link to="/refusjon">
+              Alle krav
+              <ArrowRight />
+            </Link>
+          </Button>
+        }
       >
         <ul className="divide-y">
           {soonest.map((g) => (
             <li key={g.key}>
               <Link
-                to={`/gjenvinning?type=${encodeURIComponent(g.kind)}&q=${encodeURIComponent(g.produkt.slice(0, 24))}`}
+                to={`/refusjon?type=${encodeURIComponent(g.kind)}&q=${encodeURIComponent(g.produkt.slice(0, 24))}`}
                 className="flex items-center gap-3 py-2.5 transition-colors hover:bg-accent/40"
               >
-                <span className={`w-14 shrink-0 text-sm tabnum ${g.dager_igjen! <= 90 ? 'font-medium text-destructive' : 'text-muted-foreground'}`}>
+                <span
+                  className={`w-14 shrink-0 text-sm tabnum ${g.dager_igjen! <= 90 ? "font-medium text-destructive" : "text-muted-foreground"}`}
+                >
                   {n(g.dager_igjen)} d
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{g.produkt || '—'}</span>
+                  <span className="block truncate text-sm font-medium">
+                    {g.produkt || "—"}
+                  </span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {g.kind} · {g.aktor || '—'} · {plural(g.tollnummers.length, 'fortolling', 'fortollinger')}
+                    {g.kind} · {g.aktor || "—"} ·{" "}
+                    {plural(g.tollnummers.length, "fortolling", "fortollinger")}
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-medium tabnum"><Amount nok={g.amount_nok} /></span>
+                <span className="shrink-0 text-sm font-medium tabnum">
+                  <Amount nok={g.amount_nok} />
+                </span>
               </Link>
             </li>
           ))}
-          {!soonest.length && <li className="py-8 text-center text-sm text-muted-foreground">Ingen krav med registrert frist.</li>}
+          {!soonest.length && (
+            <li className="py-8 text-center text-sm text-muted-foreground">
+              Ingen krav med registrert frist.
+            </li>
+          )}
         </ul>
       </Section>
 
@@ -210,46 +296,78 @@ export function Dashboard() {
         title="Grunnlaget"
         description="Hvor mye av 3-årsvinduet som er dekket, og hvor mye av det som faktisk er kontrollert."
       >
-        <div className={
-          'grid gap-y-8 sm:grid-cols-2 lg:grid-cols-4 ' +
-          '[&>*]:border-l [&>*]:border-border-strong [&>*]:pl-6 ' +
-          'sm:[&>*:nth-child(2n+1)]:border-l-0 sm:[&>*:nth-child(2n+1)]:pl-0 ' +
-          'lg:[&>*:nth-child(2n+1)]:border-l lg:[&>*:nth-child(2n+1)]:pl-6 ' +
-          'lg:[&>*:nth-child(4n+1)]:border-l-0 lg:[&>*:nth-child(4n+1)]:pl-0'
-        }>
+        <div
+          className={
+            "grid gap-y-8 sm:grid-cols-2 lg:grid-cols-4 " +
+            "[&>*]:border-l [&>*]:border-border-strong [&>*]:pl-6 " +
+            "sm:[&>*:nth-child(2n+1)]:border-l-0 sm:[&>*:nth-child(2n+1)]:pl-0 " +
+            "lg:[&>*:nth-child(2n+1)]:border-l lg:[&>*:nth-child(2n+1)]:pl-6 " +
+            "lg:[&>*:nth-child(4n+1)]:border-l-0 lg:[&>*:nth-child(4n+1)]:pl-0"
+          }
+        >
           <div>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-muted-foreground">Agent-vurderte krav</span>
-              <span className="text-sm font-medium tabnum">{n(ins.actions.assessed)} / {n(ins.actions.count)}</span>
+              <span className="text-sm text-muted-foreground">
+                Agent-vurderte krav
+              </span>
+              <span className="text-sm font-medium tabnum">
+                {n(ins.actions.assessed)} / {n(ins.actions.count)}
+              </span>
             </div>
             <Progress value={assessedPct} className="mt-2" />
-            <Caption className="mt-1.5">Slått opp mot faktiske satser i tolltariffen. Resten hviler på tekstheuristikk.</Caption>
-          </div>
-
-          <div>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-muted-foreground">Avgifter fordelt på type</span>
-              <span className="text-sm font-medium tabnum">{Math.round(chargeCov.pct)} %</span>
-            </div>
-            <Progress value={chargeCov.pct} className="mt-2" />
             <Caption className="mt-1.5">
-              <Amount nok={chargeCov.lineLevel} /> av <Amount nok={chargeCov.declared} /> betalt er registrert per varelinje.
+              Slått opp mot faktiske satser i tolltariffen. Resten hviler på
+              tekstheuristikk.
             </Caption>
           </div>
 
           <div>
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-muted-foreground">Deklarasjoner</span>
-              <Link to="/deklarasjoner" className="text-sm font-medium tabnum hover:text-primary">{n(m.declarations)}</Link>
+              <span className="text-sm text-muted-foreground">
+                Avgifter fordelt på type
+              </span>
+              <span className="text-sm font-medium tabnum">
+                {Math.round(chargeCov.pct)} %
+              </span>
+            </div>
+            <Progress value={chargeCov.pct} className="mt-2" />
+            <Caption className="mt-1.5">
+              <Amount nok={chargeCov.lineLevel} /> av{" "}
+              <Amount nok={chargeCov.declared} /> betalt er registrert per
+              varelinje.
+            </Caption>
+          </div>
+
+          <div>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm text-muted-foreground">
+                Deklarasjoner
+              </span>
+              <Link
+                to="/deklarasjoner"
+                className="text-sm font-medium tabnum hover:text-primary"
+              >
+                {n(m.declarations)}
+              </Link>
             </div>
             <div className="mt-2 space-y-1">
               {(ins.coverage?.byYear ?? []).map((y: any) => {
-                const max = Math.max(1, ...ins.coverage.byYear.map((x: any) => x.n));
+                const max = Math.max(
+                  1,
+                  ...ins.coverage.byYear.map((x: any) => x.n),
+                );
                 return (
                   <div key={y.year} className="flex items-center gap-2">
-                    <span className="w-8 shrink-0 text-2xs tabnum text-muted-foreground">{y.year}</span>
-                    <span className="h-1.5 min-w-[3px] rounded-full bg-primary/70" style={{ width: `${(y.n / max) * 100}%` }} />
-                    <span className="ml-auto text-2xs tabnum text-muted-foreground">{n(y.n)}</span>
+                    <span className="w-8 shrink-0 text-2xs tabnum text-muted-foreground">
+                      {y.year}
+                    </span>
+                    <span
+                      className="h-1.5 min-w-[3px] rounded-full bg-primary/70"
+                      style={{ width: `${(y.n / max) * 100}%` }}
+                    />
+                    <span className="ml-auto text-2xs tabnum text-muted-foreground">
+                      {n(y.n)}
+                    </span>
                   </div>
                 );
               })}
@@ -259,28 +377,44 @@ export function Dashboard() {
           <div>
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm text-muted-foreground">Varer</span>
-              <Link to="/varer" className="text-sm font-medium tabnum hover:text-primary">{n(goods.groups)}</Link>
+              <Link
+                to="/varer"
+                className="text-sm font-medium tabnum hover:text-primary"
+              >
+                {n(goods.groups)}
+              </Link>
             </div>
             <dl className="mt-2 space-y-1.5 text-xs">
               <div className="flex items-baseline justify-between gap-2">
                 <dt className="text-muted-foreground">Må rettes</dt>
-                <dd><Badge variant={goods.flagged ? 'destructive' : 'secondary'}>{n(goods.flagged)}</Badge></dd>
+                <dd>
+                  <Badge variant={goods.flagged ? "destructive" : "secondary"}>
+                    {n(goods.flagged)}
+                  </Badge>
+                </dd>
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <dt className="text-muted-foreground">Merket variasjon</dt>
-                <dd className="tabnum text-muted-foreground">{n(goods.noted)}</dd>
+                <dd className="tabnum text-muted-foreground">
+                  {n(goods.noted)}
+                </dd>
               </div>
               <div className="flex items-baseline justify-between gap-2">
                 <dt className="text-muted-foreground">Varelinjer</dt>
-                <dd className="tabnum text-muted-foreground">{n(goods.lines)}</dd>
+                <dd className="tabnum text-muted-foreground">
+                  {n(goods.lines)}
+                </dd>
               </div>
             </dl>
           </div>
         </div>
       </Section>
 
-      {cur !== 'NOK' && (
-        <Caption>Alle beløp er regnet om fra NOK til {cur} med dagens kurs. Lagrede verdier er i NOK.</Caption>
+      {cur !== "NOK" && (
+        <Caption>
+          Alle beløp er regnet om fra NOK til {cur} med dagens kurs. Lagrede
+          verdier er i NOK.
+        </Caption>
       )}
     </>
   );

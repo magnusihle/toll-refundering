@@ -1,16 +1,27 @@
-import * as React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import * as React from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { AlertTriangle } from "lucide-react";
 import {
-  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
-  SidebarHeader, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarSeparator, useSidebar,
-} from '@/components/ui/sidebar';
-import { useData } from '@/lib/data';
-import { NAV, GROUPS } from '@/lib/nav';
-import { n } from '@/lib/format';
-import { agg } from '@/lib/recovery';
-import { groupGoods, groupSummary } from '@/lib/group';
-import { groupSuppliers } from '@/lib/suppliers';
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuBadge,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarSeparator,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { useData } from "@/lib/data";
+import { NAV, GROUPS } from "@/lib/nav";
+import { n } from "@/lib/format";
+import { agg } from "@/lib/recovery";
+import { groupGoods, groupSummary } from "@/lib/group";
+import { groupSuppliers } from "@/lib/suppliers";
 
 /** Live counts on the nav items, so the menu says where the work is. */
 function useNavCounts() {
@@ -20,10 +31,13 @@ function useNavCounts() {
     const rec = agg(ins.actions.rows);
     const goods = groupSummary(groupGoods(data.goods));
     return {
-      '/gjenvinning': { text: n(ins.actions.count), urgent: rec.urgentCount },
-      '/varer': { text: n(goods.groups), urgent: 0 },
-      '/deklarasjoner': { text: n(data.declarations.length), urgent: 0 },
-      '/leverandorer': { text: n(groupSuppliers(data.declarations).length), urgent: 0 },
+      "/refusjon": { text: n(ins.actions.count), urgent: rec.urgentCount },
+      "/varer": { text: n(goods.groups), urgent: 0 },
+      "/deklarasjoner": { text: n(data.declarations.length), urgent: 0 },
+      "/leverandorer": {
+        text: n(groupSuppliers(data.declarations).length),
+        urgent: 0,
+      },
     } as Record<string, { text: string; urgent?: number }>;
   }, [data]);
 }
@@ -35,8 +49,11 @@ export function AppSidebar() {
   const data = useData();
   const win = data.meta.claimWindow;
 
-  const close = () => { if (isMobile) setOpenMobile(false); };
-  const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
+  const close = () => {
+    if (isMobile) setOpenMobile(false);
+  };
+  const isActive = (to: string) =>
+    to === "/" ? pathname === "/" : pathname.startsWith(to);
 
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">
@@ -48,8 +65,12 @@ export function AppSidebar() {
             D
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="truncate text-lg font-medium leading-tight tracking-[-0.02em]">Declaro.</div>
-            <div className="truncate text-2xs leading-tight text-sidebar-foreground/55">Arnika AS · fortolling</div>
+            <div className="truncate text-lg font-medium leading-tight tracking-[-0.02em]">
+              Declaro.
+            </div>
+            <div className="truncate text-2xs leading-tight text-sidebar-foreground/55">
+              Arnika AS · fortolling
+            </div>
           </div>
         </div>
       </SidebarHeader>
@@ -74,9 +95,9 @@ export function AppSidebar() {
                         isActive={active}
                         tooltip={item.label}
                         className={
-                          'h-9 rounded-md text-base font-normal ' +
-                          'data-[active=true]:font-medium ' +
-                          'data-[active=true]:[&>svg]:text-sidebar-accent-foreground'
+                          "h-9 rounded-md text-base font-normal " +
+                          "data-[active=true]:font-medium " +
+                          "data-[active=true]:[&>svg]:text-sidebar-accent-foreground"
                         }
                       >
                         <NavLink to={item.to} onClick={close}>
@@ -86,7 +107,8 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                       {c?.urgent ? (
                         <SidebarMenuBadge className="gap-1 text-destructive">
-                          <AlertTriangle className="size-3" />{c.urgent}
+                          <AlertTriangle className="size-3" />
+                          {c.urgent}
                         </SidebarMenuBadge>
                       ) : c?.text ? (
                         <SidebarMenuBadge>{c.text}</SidebarMenuBadge>
@@ -102,8 +124,12 @@ export function AppSidebar() {
 
       <SidebarFooter>
         <div className="border-t border-sidebar-border px-2 pb-1 pt-3 text-2xs leading-relaxed text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
-          <div className="t-eyebrow mb-1.5 text-sidebar-foreground/45">3-årsvindu</div>
-          <div className="tabnum">{win?.from} – {win?.to}</div>
+          <div className="t-eyebrow mb-1.5 text-sidebar-foreground/45">
+            3-årsvindu
+          </div>
+          <div className="tabnum">
+            {win?.from} – {win?.to}
+          </div>
           <div>Frist regnes fra i dag ({win?.tz})</div>
         </div>
       </SidebarFooter>
