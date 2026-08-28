@@ -4,16 +4,15 @@ import { Badge } from '@/components/ui/badge';
 import { TableSection } from '@/components/ui/section';
 import { DataTable } from '@/components/DataTable';
 import { StatCard, StatRow } from '@/components/StatCard';
-import { PageHeader } from '@/components/PageHeader';
 import { Segmented } from '@/components/Segmented';
 import { Amount, Num } from '@/components/ui/metric';
 import { expandColumn, Primary, Secondary, Code, MoneyCell, CountCell, MultiValue, Period } from '@/components/table/cells';
 import { RowDetail, COL, entryColumns, type DetailStrip } from '@/components/table/RowDetail';
 import { useData, useEntryIndex } from '@/lib/data';
+import { useFilters, type FilterDef } from '@/lib/filters';
 import { n, n2, plural } from '@/lib/format';
 import { groupGoods, groupSummary, lineDeviations, isProductVariance, type GoodsGroup } from '@/lib/group';
 import { formatRate } from '@/lib/charges';
-import { navItemFor } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 
 // Satsen er prosent for noen avgiftstyper og kroner per enhet for andre — enheten
@@ -29,7 +28,7 @@ function VarianceBadges({ g }: { g: GoodsGroup }) {
   return (
     <span className="whitespace-nowrap" title={vs.map((v) => v.label).join(' · ')}>
       <Badge variant={first.severity === 'avvik' ? 'destructive' : 'warning'}>{first.label}</Badge>
-      {rest.length ? <span className="ml-1 text-xs font-medium text-amber-600 dark:text-amber-400">+{rest.length}</span> : null}
+      {rest.length ? <span className="ml-1 text-xs font-medium text-warning">+{rest.length}</span> : null}
     </span>
   );
 }
@@ -50,7 +49,7 @@ function GroupDetail({ g }: { g: GoodsGroup }) {
     value: (
       <>
         {c.rates.filter((r) => r != null).length > 0 && (
-          <span className={cn('mr-2 text-xs', c.rates.filter((r) => r != null).length > 1 ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
+          <span className={cn('mr-2 text-xs', c.rates.filter((r) => r != null).length > 1 ? 'font-medium text-warning' : 'text-muted-foreground')}>
             {rateStr(c.rates, c.unit)}
           </span>)}
         {c.source === 'vat' ? <span className="text-muted-foreground">grunnlag {n(c.base)}</span> : <Amount nok={c.amount} />}
@@ -101,14 +100,33 @@ function GroupDetail({ g }: { g: GoodsGroup }) {
 export function Goods() {
   const data = useData();
   const [mode, setMode] = React.useState<'grouped' | 'flat'>('grouped');
-  const [onlyFlagged, setOnlyFlagged] = React.useState(false);
 
   const groups = React.useMemo(() => groupGoods(data.goods), [data.goods]);
   // Filteret viser bare ekte avvik (ulikt varenummer / MVA-sats / tollsats på samme
   // grunnlag). «Merk»-variasjonene — ulikt opphav, ulik preferanse, ulik skrivemåte —
   // er som regel legitime og ville druknet de som faktisk må rettes.
-  const shown = React.useMemo(() => (onlyFlagged ? groups.filter((g) => g._flag) : groups), [groups, onlyFlagged]);
   const sum = React.useMemo(() => groupSummary(groups), [groups]);
+
+  // Filteret er deklarert på GRUPPEN, fordi avviksflagget er en egenskap ved
+  // gruppen. Flat visning utledes av de samme filtrerte gruppene — tidligere
+  // fikk den `data.goods` ufiltrert, så «Må rettes» endret tittel og telling,
+  // men ikke radene.
+  const defs = React.useMemo<FilterDef<GoodsGroup>[]>(() => [{
+    key: 'utvalg',
+    label: 'Utvalg',
+    fallback: 'alle',
+    options: [
+      { value: 'alle', label: 'Alle varer', count: sum.groups },
+      { value: 'avvik', label: 'Må rettes', count: sum.flagged },
+    ],
+    apply: (list, v) => (v === 'avvik' ? list.filter((g) => g._flag) : list),
+    explain: <>Ulikt varenummer, MVA-sats eller tollsats på samme vare og opphav. «Merk»-variasjoner — ulikt opphav eller skrivemåte — er som regel legitime og holdes utenfor.</>,
+  }], [sum.groups, sum.flagged]);
+  const filters = useFilters(defs);
+  const onlyFlagged = filters.value('utvalg') === 'avvik';
+
+  const shown = React.useMemo(() => filters.apply(groups), [filters, groups]);
+  const flatRows = React.useMemo(() => shown.flatMap((g) => g.lines), [shown]);
   const groupCols = [
     expandColumn(),
     { accessorKey: 'produkt', header: 'Vare', cell: (c: any) => <Primary title={c.getValue()}>{c.getValue()}</Primary> },
@@ -117,7 +135,7 @@ export function Goods() {
         <span className="flex items-baseline gap-1">
           <Secondary title={g.aktorSpellings.join(' / ')}>{c.getValue()}</Secondary>
           {g.aktorSpellings.length > 1
-            ? <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-400">+{g.aktorSpellings.length - 1}</span>
+            ? <span className="shrink-0 text-xs font-medium text-warning">+{g.aktorSpellings.length - 1}</span>
             : null}
         </span>); } },
     { id: 'hs', header: 'HS', accessorFn: (r: GoodsGroup) => r.hs_codes.join(' '), cell: (c: any) => <MultiValue values={c.row.original.hs_codes} render={(v) => <Code>{v}</Code>} /> },
@@ -144,45 +162,44 @@ export function Goods() {
     { id: 'charges', header: 'Avgifter', accessorFn: (r: any) => chargeStr(r.charges) },
   ];
 
+  const view = {
+    label: 'Gruppering',
+    value: mode,
+    onChange: (v: string) => setMode(v as 'grouped' | 'flat'),
+    options: [{ value: 'grouped', label: 'Gruppert' }, { value: 'flat', label: 'Alle linjer' }],
+  };
+
   return (
     <>
-      <PageHeader title="Varer" blurb={navItemFor('/varer').blurb} />
-
       <StatRow cols={3}>
         <StatCard
           label="Varer" icon={Package}
           value={<Num value={sum.groups} />}
-          hint={<>Konsolidert fra {n(sum.lines)} varelinjer — én rad per vare, ikke én per sending.</>}
+          hint={<>Konsolidert fra {n(sum.lines)} varelinjer.</>}
         />
         <StatCard
           label="Må rettes" icon={AlertTriangle}
           tone={sum.flagged ? 'risk' : 'muted'}
-          active={onlyFlagged}
-          onClick={() => setOnlyFlagged((v) => !v)}
           value={<Num value={sum.flagged} />}
-          hint={onlyFlagged
-            ? 'Viser kun disse — klikk for å vise alle igjen.'
-            : 'Ulikt varenummer, MVA-sats eller tollsats på samme vare og opphav. Klikk for å filtrere.'}
+          hint={<>Av {n(sum.groups)} varer.</>}
         />
         <StatCard
           label="Merket variasjon" icon={Info} tone="caution"
           value={<Num value={sum.noted} />}
-          hint="Ulikt opphav, ulik preferanse eller skrivemåte på tvers av sendingene — oftest legitimt, men verdt et blikk. Samme gule «+N» som i tabellen."
+          hint="Oftest legitimt, men verdt et blikk."
         />
       </StatRow>
 
       <TableSection
         title={onlyFlagged ? 'Varer som må rettes' : 'Alle varer'}
-        description={<>Samme vare fra samme leverandør får én varelinje per sending. Her er de slått sammen til
-          <b> én rad per vare</b>; «+N» i en kolonne betyr at sendingene ikke ble behandlet likt. Utvid en rad for å se
-          alle deklarasjonene varen har inngått i, med avgifter per linje.</>}
-        action={<Segmented value={mode} onChange={(v) => setMode(v as any)} options={[{ value: 'grouped', label: 'Gruppert' }, { value: 'flat', label: 'Alle linjer' }]} />}
       >
         {mode === 'grouped'
           ? <DataTable columns={groupCols} data={shown} filterPlaceholder="Søk vare / HS / artikkel / aktør…"
+              defs={defs} filters={filters} view={view} total={groups.length} unit="varer"
               getRowCanExpand={() => true} renderSubComponent={(row) => <GroupDetail g={row.original as GoodsGroup} />}
               empty={onlyFlagged ? 'Ingen varer med avvik som må rettes.' : undefined} />
-          : <DataTable columns={flatCols} data={data.goods} filterPlaceholder="Søk HS / vare / artikkel…" />}
+          : <DataTable columns={flatCols} data={flatRows} filterPlaceholder="Søk HS / vare / artikkel…"
+              defs={defs as any} filters={filters as any} view={view} total={data.goods.length} unit="varelinjer" />}
       </TableSection>
     </>
   );

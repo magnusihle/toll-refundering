@@ -25,7 +25,7 @@ function CurrencySelect() {
       {cur !== 'NOK' && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="hidden cursor-default rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-medium text-amber-700 dark:text-amber-400 sm:inline">
+            <span className="hidden cursor-default rounded-xs border border-warning/30 bg-warning/[0.09] px-1.5 py-0.5 text-2xs font-medium text-warning sm:inline">
               omregnet
             </span>
           </TooltipTrigger>
@@ -37,7 +37,9 @@ function CurrencySelect() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Select value={cur} onValueChange={setCur}>
-            <SelectTrigger className="h-8 w-[86px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-8 gap-0.5 rounded-md border-transparent bg-transparent px-2 text-xs text-muted-foreground hover:bg-surface-sunken">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>{currencies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
           </Select>
         </TooltipTrigger>
@@ -57,7 +59,7 @@ function ThemeMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8">
+        <Button variant="ghost" size="icon-sm">
           {resolved === 'dark' ? <Moon className="size-4" /> : <Sun className="size-4" />}
           <span className="sr-only">Bytt tema</span>
         </Button>
@@ -82,8 +84,8 @@ function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 gap-2 px-2">
-          <span className="grid size-6 place-items-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">{initials}</span>
+        <Button variant="ghost" size="sm" className="gap-2 px-2">
+          <span className="grid size-6 place-items-center rounded-full bg-primary/10 text-2xs font-semibold text-primary">{initials}</span>
           <span className="hidden max-w-[160px] truncate text-xs text-muted-foreground sm:inline">{email}</span>
         </Button>
       </DropdownMenuTrigger>
@@ -105,27 +107,33 @@ export function Header() {
   const data = useData();
   const { reload } = useDataCtx();
   const stamp = data.meta.snapshotAt || data.meta.generatedAt;
+  const stampLabel = new Date(stamp).toLocaleDateString('nb-NO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header data-app-header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4 md:px-6">
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-1 h-5" />
+      {/* Sidens ENE overskrift. Sto tidligere også som <h1 class="t-page"> i
+          sidekroppen — samme ord to ganger, 60 px fra hverandre. Her følger den
+          med når du scroller en tabell på 933 rader. */}
       <div className="flex min-w-0 items-center gap-2">
         <item.icon className="size-4 shrink-0 text-muted-foreground" />
-        <span className="truncate text-sm font-medium">{item.label}</span>
+        <h1 className="t-small truncate font-medium">{item.label}</h1>
       </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="hidden text-[11px] text-muted-foreground lg:inline">
-              Oppdatert {new Date(stamp).toLocaleDateString('nb-NO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">Tidspunktet datagrunnlaget sist ble hentet</TooltipContent>
-        </Tooltip>
+      <div className="ml-auto flex items-center gap-1">
+        {/* Hosted kjører ingen selvbetjent henting, så der er stempelet bare tekst. */}
+        {HOSTED ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="hidden px-2 text-xs text-muted-foreground lg:inline">Oppdatert {stampLabel}</span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Tidspunktet datagrunnlaget sist ble hentet</TooltipContent>
+          </Tooltip>
+        ) : (
+          <RefreshButton stamp={`Oppdatert ${stampLabel}`} onDone={reload} />
+        )}
         <CurrencySelect />
-        {!HOSTED && <RefreshButton onDone={reload} />}
         <ThemeMenu />
         {HOSTED && <UserMenu />}
       </div>

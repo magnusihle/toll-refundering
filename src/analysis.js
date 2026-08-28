@@ -610,10 +610,24 @@ export function raakReconciliation({ win = claimWindow() } = {}) {
 // written summary and a concrete next step, for review/export and handoff to DSV.
 export function actionList(pref, raak, prod) {
   const rows = [];
-  for (const r of pref.items) rows.push({ kind: 'Preferanse', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, likelihood: r.likelihood, reasoning: r.reasoning, claim_draft: r.claim_draft, mekanisme: r.mekanisme, bku: r.bku });
+  for (const r of pref.items) rows.push({ kind: 'Preferanse', linje: r.item_number, tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.tier, amount_nok: r.recoverable, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action, likelihood: r.likelihood, reasoning: r.reasoning, claim_draft: r.claim_draft, mekanisme: r.mekanisme, bku: r.bku });
   for (const r of raak.items) rows.push({ kind: 'RÅK', tollnummer: r.tollnummer, godkjent: r.godkjent, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: r.confidence, amount_nok: r.est_overpay, frist: r.claim_deadline, dager_igjen: r.days_left, summary: r.summary, action: r.action });
   for (const r of prod.items) rows.push({ kind: 'Produkt', tollnummer: (r.tollnummers || [])[0], godkjent: null, aktor: r.aktor, produkt: (r.description || '').trim(), confidence: 'info', amount_nok: r.est_vat_overpay, frist: null, dager_igjen: null, summary: r.summary, action: r.action });
   rows.sort((a, b) => (b.amount_nok || 0) - (a.amount_nok || 0));
+  // Hvert krav trenger en STABIL id. Uten den kan ikke frontend la brukeren
+  // velge enkeltkrav: 35 av 321 krav deler kind+tollnummer+produkt, så en utledet
+  // nøkkel ville krysset av kravets tvilling og sendt feil sum til 3PL.
+  // Linjenummeret gjør id-en unik der vi har det; ellers teller vi opp
+  // forekomsten, som holder innenfor ett datagrunnlag.
+  {
+    const seen = new Map();
+    for (const r of rows) {
+      const base = ['k', r.kind, r.tollnummer ?? '', r.linje ?? '', r.produkt].join('|');
+      const nth = (seen.get(base) ?? 0) + 1;
+      seen.set(base, nth);
+      r.id = nth === 1 ? base : `${base}|${nth}`;
+    }
+  }
   const totalStrong = round2(rows.filter((r) => r.confidence === 'strong' || r.tier === 'strong').reduce((s, r) => s + (r.amount_nok || 0), 0));
   // ÉN kilde for vektingen (frontend speiler denne i web/src/lib/recovery.ts).
   // Agentens sannsynlighet går foran match-styrken når den finnes.

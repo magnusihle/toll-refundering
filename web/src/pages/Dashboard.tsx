@@ -5,22 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Section } from '@/components/ui/section';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { PageHeader } from '@/components/PageHeader';
-import { Amount, Caption, Figure, Num } from '@/components/ui/metric';
+import { Amount, Caption, FieldLabel, Figure, Num } from '@/components/ui/metric';
 import { useData } from '@/lib/data';
 import { useCurrency } from '@/lib/currency';
 import { n, plural } from '@/lib/format';
 import { agg, rowsFor, groupClaims, TYPES } from '@/lib/recovery';
 import { groupGoods, groupSummary } from '@/lib/group';
 import { chargeCoverage } from '@/lib/coverage';
-
-// Én farge per kravtype, tildelt etter type og aldri etter rangering, slik at et
-// filter aldri maler om de radene som blir igjen.
-const TYPE_COLOR: Record<string, string> = {
-  Preferanse: 'var(--chart-1)',
-  'RÅK': 'var(--chart-2)',
-  Produkt: 'var(--chart-3)',
-};
+import { useMinAmount, splitByAmount } from '@/lib/threshold';
+// Én farge per kravtype, delt med tabellbadgene, tildelt etter type og aldri
+// etter rangering, slik at et filter aldri maler om de radene som blir igjen.
+import { KIND_COLOR } from '@/components/table/cells';
 
 /**
  * Dashbordet svarer på ett spørsmål: hva gjør jeg nå?
@@ -35,17 +30,26 @@ export function Dashboard() {
   const ins = data.insights;
   const m = data.meta;
 
-  const all = agg(ins.actions.rows);
+  // Dashbordet regner på det som er verdt å hente, ikke på alt som finnes.
+  // Grensen deles med Refusjon-siden, så tallene her og der er samme utvalg.
+  const [minAmount] = useMinAmount();
+  const split = React.useMemo(() => splitByAmount(ins.actions.rows, minAmount), [ins.actions.rows, minAmount]);
+  const worth = split.material;
+
+  const all = agg(worth);
+  const everything = agg(ins.actions.rows);
+  const sharePct = everything.likely > 0 ? Math.round((all.likely / everything.likely) * 100) : 0;
+
   const byType = React.useMemo(
     () => TYPES.filter((k) => k !== 'alle')
-      .map((k) => ({ kind: k, ...agg(rowsFor(ins.actions.rows, k)) }))
+      .map((k) => ({ kind: k, ...agg(rowsFor(worth, k)) }))
       .filter((t) => t.likely > 0)
       .sort((a, b) => b.likely - a.likely),
-    [ins.actions.rows]
+    [worth]
   );
   const mixTotal = byType.reduce((s, t) => s + t.likely, 0) || 1;
 
-  const groups = React.useMemo(() => groupClaims(ins.actions.rows), [ins.actions.rows]);
+  const groups = React.useMemo(() => groupClaims(worth), [worth]);
   const soonest = React.useMemo(
     () => groups.filter((g) => g.dager_igjen != null && g.amount_nok > 0)
       .sort((a, b) => a.dager_igjen! - b.dager_igjen!)
@@ -56,22 +60,24 @@ export function Dashboard() {
   const goods = React.useMemo(() => groupSummary(groupGoods(data.goods)), [data.goods]);
   const chargeCov = React.useMemo(() => chargeCoverage(data.declarations), [data.declarations]);
   const assessedPct = ins.actions.count ? Math.round((ins.actions.assessed / ins.actions.count) * 100) : 0;
+  const belowCount = split.below.length;
   const pctOfCeiling = all.ceiling > 0 ? (v: number) => Math.min(100, (v / all.ceiling) * 100) : () => 0;
 
   return (
     <>
-      <PageHeader
-        title="Dashbord"
-        blurb={`Arnika AS · ${m.claimWindow?.from} – ${m.claimWindow?.to}. Fristen for tilbakebetaling er 3 år fra fortollingsdato.`}
-        actions={<Button asChild><Link to="/gjenvinning">Se alle krav<ArrowRight /></Link></Button>}
-      />
+      {/* Tilstand, ikke ingress: hvem, hvilket vindu, hvilken frist. Sidenavnet
+          står i topplinjen, og «Se alle krav» lå her som appens eneste fylte
+          lg-knapp — samme lenke som «Alle krav →» under «Ta disse først». */}
+      <p className="text-sm text-muted-foreground">
+        Arnika AS · {m.claimWindow?.from} – {m.claimWindow?.to}. Fristen for tilbakebetaling er 3 år fra fortollingsdato.
+      </p>
 
       <Section
-        title="Hva som er å hente"
+        title="Verdt å hente"
         description="«Sannsynlig» er tallet å planlegge etter. «Tak» forutsetter at absolutt alt går igjennom — det skjer ikke."
       >
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-10">
-          <div>
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-0">
+          <div className="lg:pr-10">
             <Figure
               size="display"
               tone="positive"
@@ -91,35 +97,49 @@ export function Dashboard() {
                   { k: 'Øvre tak', v: all.ceiling, swatch: 'bg-primary/12' },
                 ].map((x) => (
                   <div key={x.k}>
-                    <dt className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span className={`size-2 shrink-0 rounded-[2px] ${x.swatch}`} />{x.k}
+                    <dt className="flex items-center gap-1.5 text-2xs text-muted-foreground">
+                      <span className={`size-2 shrink-0 rounded-xxs ${x.swatch}`} />{x.k}
                     </dt>
                     <dd className="mt-1 text-sm font-medium tabnum"><Amount nok={x.v} /></dd>
                   </div>
                 ))}
               </dl>
             </div>
+
+            {/* Det viktigste dashbordet kan si: hvor verdien faktisk ligger.
+                Uten dette ser 321 krav ut som 321 oppgaver — de er 42. */}
+            {belowCount > 0 && (
+              <p className="mt-6 border-t border-border-strong pt-5 text-sm leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">
+                  {n(all.count)} av {n(everything.count)} krav er over {n(minAmount)} kr
+                </span>{' '}
+                og utgjør <span className="font-medium text-foreground tabnum">{sharePct} %</span> av verdien.
+                De øvrige {n(belowCount)} er til sammen <span className="tabnum"><Amount nok={split.belowValue} /></span> —
+                mindre enn én omberegning koster å be om. Grensen justeres på{' '}
+                <Link to="/gjenvinning" className="text-primary underline-offset-4 hover:underline">Refusjon</Link>.
+              </p>
+            )}
           </div>
 
-          <div>
-            <div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Fordelt på kravtype</div>
-            <div className="mt-3 flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full">
+          <div className="lg:border-l lg:border-border-strong lg:pl-10">
+            <FieldLabel className="block">Fordelt på kravtype</FieldLabel>
+            <div className="mt-3.5 flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full">
               {byType.map((t) => (
                 <div
                   key={t.kind}
                   className="h-full rounded-full"
-                  style={{ width: `${Math.max(3, (t.likely / mixTotal) * 100)}%`, background: TYPE_COLOR[t.kind] }}
+                  style={{ width: `${Math.max(3, (t.likely / mixTotal) * 100)}%`, background: KIND_COLOR[t.kind] }}
                 />
               ))}
             </div>
-            <ul className="mt-3 divide-y">
+            <ul className="mt-3.5 divide-y">
               {byType.map((t) => (
                 <li key={t.kind}>
                   <Link
                     to={`/gjenvinning?type=${encodeURIComponent(t.kind)}`}
                     className="flex items-center gap-3 py-2.5 transition-colors hover:text-primary"
                   >
-                    <span className="size-2.5 shrink-0 rounded-[2px]" style={{ background: TYPE_COLOR[t.kind] }} />
+                    <span className="size-2.5 shrink-0 rounded-xxs" style={{ background: KIND_COLOR[t.kind] }} />
                     <span className="text-sm font-medium">{t.kind}</span>
                     <span className="text-xs text-muted-foreground">{n(t.count)} krav</span>
                     <span className="ml-auto text-sm font-medium tabnum"><Amount nok={t.likely} /></span>
@@ -130,17 +150,37 @@ export function Dashboard() {
                 </li>
               ))}
             </ul>
+
+            {/* Det som haster sto tidligere som fotnote under listen lenger nede,
+                der ingen så det. Her deler det plass med miksen og fyller spalten. */}
+            {all.urgentCount ? (
+              <Link
+                to="/gjenvinning?frist=haster"
+                className="mt-7 flex items-baseline gap-3 border-t border-border-strong pt-5 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <span className="text-3xl font-medium tabnum text-destructive"><Num value={all.urgentCount} /></span>
+                <span className="min-w-0">
+                  <span className="block text-base font-medium">
+                    krav foreldes innen 90 dager
+                  </span>
+                  <span className="block text-sm text-muted-foreground">
+                    Et krav som foreldes er tapt. Vis bare disse →
+                  </span>
+                </span>
+              </Link>
+            ) : (
+              <p className="mt-7 border-t border-border-strong pt-5 text-sm text-muted-foreground">
+                Ingen krav foreldes de neste 90 dagene.
+              </p>
+            )}
           </div>
         </div>
       </Section>
 
       <Section
         title="Ta disse først"
-        description="Kortest frist øverst. 3-årsfristen løper fra fortollingsdato, og et krav som foreldes er tapt."
-        action={<Button asChild variant="ghost" size="sm" className="-mr-2 h-7 text-xs"><Link to="/gjenvinning">Alle krav<ArrowRight /></Link></Button>}
-        footer={all.urgentCount
-          ? <><Num value={all.urgentCount} /> krav har under 90 dager igjen. <Link to="/gjenvinning?frist=haster" className="text-primary hover:underline">Vis bare disse</Link>.</>
-          : 'Ingen krav foreldes de neste 90 dagene.'}
+        description="Kortest frist øverst. Et krav som foreldes er tapt."
+        action={<Button asChild variant="ghost" size="sm" className="-mr-3"><Link to="/gjenvinning">Alle krav<ArrowRight /></Link></Button>}
       >
         <ul className="divide-y">
           {soonest.map((g) => (
@@ -170,7 +210,13 @@ export function Dashboard() {
         title="Grunnlaget"
         description="Hvor mye av 3-årsvinduet som er dekket, og hvor mye av det som faktisk er kontrollert."
       >
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={
+          'grid gap-y-8 sm:grid-cols-2 lg:grid-cols-4 ' +
+          '[&>*]:border-l [&>*]:border-border-strong [&>*]:pl-6 ' +
+          'sm:[&>*:nth-child(2n+1)]:border-l-0 sm:[&>*:nth-child(2n+1)]:pl-0 ' +
+          'lg:[&>*:nth-child(2n+1)]:border-l lg:[&>*:nth-child(2n+1)]:pl-6 ' +
+          'lg:[&>*:nth-child(4n+1)]:border-l-0 lg:[&>*:nth-child(4n+1)]:pl-0'
+        }>
           <div>
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-sm text-muted-foreground">Agent-vurderte krav</span>
@@ -201,9 +247,9 @@ export function Dashboard() {
                 const max = Math.max(1, ...ins.coverage.byYear.map((x: any) => x.n));
                 return (
                   <div key={y.year} className="flex items-center gap-2">
-                    <span className="w-8 shrink-0 text-[11px] tabnum text-muted-foreground">{y.year}</span>
+                    <span className="w-8 shrink-0 text-2xs tabnum text-muted-foreground">{y.year}</span>
                     <span className="h-1.5 min-w-[3px] rounded-full bg-primary/70" style={{ width: `${(y.n / max) * 100}%` }} />
-                    <span className="ml-auto text-[11px] tabnum text-muted-foreground">{n(y.n)}</span>
+                    <span className="ml-auto text-2xs tabnum text-muted-foreground">{n(y.n)}</span>
                   </div>
                 );
               })}

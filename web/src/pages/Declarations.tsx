@@ -4,15 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { TableSection } from '@/components/ui/section';
 import { DataTable } from '@/components/DataTable';
 import { StatCard, StatRow } from '@/components/StatCard';
-import { PageHeader } from '@/components/PageHeader';
-import { Segmented } from '@/components/Segmented';
 import { Amount, Num } from '@/components/ui/metric';
 import { expandColumn, Primary, Secondary, Code, MoneyCell, CountCell, Deadline, SadLink } from '@/components/table/cells';
 import { RowDetail, COL } from '@/components/table/RowDetail';
 import { useData } from '@/lib/data';
+import { useFilters, type FilterDef } from '@/lib/filters';
 import { n, plural } from '@/lib/format';
 import { formatRate } from '@/lib/charges';
-import { navItemFor } from '@/lib/nav';
 
 // Samme satsformattering som Varer: enheten utledes per linje, ikke gjettet.
 const chargeStr = (cs: any[]) => cs && cs.length
@@ -43,16 +41,29 @@ function Lines({ lines }: { lines: any[] }) {
 
 export function Declarations() {
   const data = useData();
-  const [year, setYear] = React.useState('alle');
 
   const years = React.useMemo(
     () => ['alle', ...[...new Set(data.declarations.map((d: any) => String(d.godkjent_iso || '').slice(0, 4)).filter(Boolean))].sort()] as string[],
     [data.declarations]
   );
-  const rows = React.useMemo(
-    () => (year === 'alle' ? data.declarations : data.declarations.filter((d: any) => String(d.godkjent_iso || '').startsWith(year))),
-    [data.declarations, year]
-  );
+
+  // Filteret er deklarert, ikke skrevet. Året lå tidligere i lokal state — det
+  // overlevde ikke refresh og kunne ikke deles som lenke.
+  const defs = React.useMemo<FilterDef<any>[]>(() => [{
+    key: 'ar',
+    label: 'År',
+    fallback: 'alle',
+    options: years.map((y) => ({
+      value: y,
+      label: y === 'alle' ? 'Alle år' : y,
+      count: y === 'alle' ? data.declarations.length : data.declarations.filter((d: any) => String(d.godkjent_iso || '').startsWith(y)).length,
+    })),
+    apply: (list, v) => (v === 'alle' ? list : list.filter((d: any) => String(d.godkjent_iso || '').startsWith(v))),
+  }], [years, data.declarations]);
+  const filters = useFilters(defs);
+  const year = filters.value('ar');
+  // Filtreringen kjøres av deklarasjonen, ikke gjentatt for hånd her.
+  const rows = React.useMemo(() => filters.apply(data.declarations), [filters, data.declarations]);
   const totals = React.useMemo(
     () => rows.reduce((acc: any, d: any) => ({
       value: acc.value + (d.value_nok || 0),
@@ -82,7 +93,6 @@ export function Declarations() {
 
   return (
     <>
-      <PageHeader title="Deklarasjoner" blurb={navItemFor('/deklarasjoner').blurb} />
 
       <StatRow>
         <StatCard
@@ -109,16 +119,15 @@ export function Declarations() {
 
       <TableSection
         title={year === 'alle' ? 'Alle fortollinger' : `Fortollinger i ${year}`}
-        description="Én rad per deklarasjon. Utvid raden for varelinjene, eller åpne kilde-SAD-en i EMMA."
-        action={<Segmented value={year} onChange={setYear} options={years.map((y) => ({
-          value: y,
-          label: y === 'alle' ? 'Alle år' : <>{y} <span className="ml-1 tabnum opacity-60">{n(data.declarations.filter((d: any) => String(d.godkjent_iso || '').startsWith(y)).length)}</span></>,
-        }))} />}
       >
         <DataTable
           columns={cols}
           data={rows}
           filterPlaceholder="Søk tollnummer / aktør…"
+          defs={defs}
+          filters={filters}
+          total={data.declarations.length}
+          unit="fortollinger"
           getRowCanExpand={() => true}
           renderSubComponent={(row) => <Lines lines={row.original.lines} />}
         />

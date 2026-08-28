@@ -23,7 +23,7 @@ import { Code, Deadline, SadLink, Secondary } from '@/components/table/cells';
  * A strip: the one way this app annotates an expanded row.
  *
  * Goods and Leverandører read well because everything above the table is a short
- * badge with, at most, a muted paragraph under it. Gjenvinning used to draw the same
+ * badge with, at most, a muted paragraph under it. Refusjon used to draw the same
  * information as full-width tinted cards instead, which is why the two pages looked
  * unrelated. There is now a single renderer — a strip is a strip whether it carries a
  * variance, a spelling drift, a next step or a draft claim; only the tint differs.
@@ -54,13 +54,13 @@ export type DetailSource = {
 
 const STRIP = {
   avvik: { box: 'bg-destructive/5', badge: 'destructive' },
-  merk: { box: 'bg-amber-500/10', badge: 'warning' },
+  merk: { box: 'bg-warning/10', badge: 'warning' },
   action: { box: 'bg-primary/5', badge: 'default' },
   info: { box: 'bg-muted/60', badge: 'secondary' },
 } as const;
 
 function SlotLabel({ children }: { children: React.ReactNode }) {
-  return <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{children}</div>;
+  return <div className="mb-1.5 text-2xs font-medium uppercase tracking-wider text-muted-foreground">{children}</div>;
 }
 
 /**
@@ -107,7 +107,7 @@ export function RowDetail({
           {factsLabel ? <SlotLabel>{factsLabel}</SlotLabel> : null}
           <div className="flex flex-wrap gap-2">
             {facts.map((f) => (
-              <div key={f.label} className={cn('rounded-lg border px-3 py-1.5 text-sm', f.flagged && 'border-amber-500/40 bg-amber-500/5')}>
+              <div key={f.label} className={cn('rounded-lg border px-3 py-1.5 text-sm', f.flagged && 'border-warning/40 bg-warning/5')}>
                 <span className="font-medium">{f.label}</span>
                 <span className="ml-2 tabnum">{f.value}</span>
               </div>
@@ -119,26 +119,40 @@ export function RowDetail({
       {source && source.rows.length > 0 && (
         <div>
           {source.caption ? <SlotLabel>{source.caption}</SlotLabel> : null}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
-                  {source.columns.map((c, i) => <th key={i} className="p-2 font-medium">{c.header}</th>)}
+          {/* Samme regel som i sidens tabell: kolonnetitlene blir stående mens
+              radene ruller. En kildetabell kan være hundre fortollinger lang, og
+              en vegg med tall uten kolonnenavn er ikke lesbar. Titlene legger seg
+              rett UNDER den klebrige varelinjen — `--row-bottom` settes av
+              DataTable, som er den eneste som vet hvor høy den linjen er.
+
+              Ingen egen rullesone her: hadde denne tabellen ligget i en
+              `overflow`-boks, ville titlene klebet til boksen i stedet for til
+              sidens tabell, og siden hadde fått en tredje rullesone. Bred kilde-
+              tabell ruller derfor vannrett sammen med tabellen den står i.
+
+              `border-separate` er samme krav som i `ui/table.tsx`: med collapse
+              males et klebrig hode UNDER radene som passerer. */}
+          <table className="w-full border-separate border-spacing-0 text-sm">
+            <thead
+              className="sticky z-0 text-left text-2xs uppercase tracking-wider text-muted-foreground"
+              style={{ top: 'var(--row-bottom, 2.5rem)' }}
+            >
+              <tr>
+                {source.columns.map((c, i) => <th key={i} className="bg-surface-sunken p-2 text-left font-medium">{c.header}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {source.rows.map((r, i) => (
+                <tr key={i} className={cn('align-top [&>td]:border-t [&>td]:border-border/60', source.rowFlagged?.(r) && 'bg-destructive/5')}>
+                  {source.columns.map((c, j) => (
+                    <td key={j} className={cn('p-2', source.cellFlagged?.(r, j) && 'bg-destructive/10 font-medium')}>
+                      {c.cell(r, i)}
+                    </td>
+                  ))}
                 </tr>
-              </thead>
-              <tbody>
-                {source.rows.map((r, i) => (
-                  <tr key={i} className={cn('border-t border-border/60 align-top', source.rowFlagged?.(r) && 'bg-destructive/5')}>
-                    {source.columns.map((c, j) => (
-                      <td key={j} className={cn('p-2', source.cellFlagged?.(r, j) && 'bg-destructive/10 font-medium')}>
-                        {c.cell(r, i)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
           {source.footnote ? <p className="mt-2 text-xs text-muted-foreground">{source.footnote}</p> : null}
         </div>
       )}

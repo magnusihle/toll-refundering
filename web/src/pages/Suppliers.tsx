@@ -4,14 +4,13 @@ import { Badge } from '@/components/ui/badge';
 import { TableSection } from '@/components/ui/section';
 import { DataTable } from '@/components/DataTable';
 import { StatCard, StatRow } from '@/components/StatCard';
-import { PageHeader } from '@/components/PageHeader';
 import { Amount, Num } from '@/components/ui/metric';
 import { expandColumn, Primary, Secondary, Code, MoneyCell, CountCell, MultiValue, Period, Deadline, SadLink } from '@/components/table/cells';
 import { RowDetail, COL, entryColumns, type DetailStrip } from '@/components/table/RowDetail';
 import { useData } from '@/lib/data';
+import { useFilters, type FilterDef } from '@/lib/filters';
 import { n, plural } from '@/lib/format';
 import { groupSuppliers, type SupplierGroup } from '@/lib/suppliers';
-import { navItemFor } from '@/lib/nav';
 
 /**
  * Leverandøren sett nedenfra: hele fortollingshistorikken, med de samme to
@@ -80,13 +79,45 @@ export function Suppliers() {
       return <span className="whitespace-nowrap tabnum text-muted-foreground">{n(c.getValue())} / {n(g.declCount)}</span>; } },
   ];
 
+  // Siden hadde ingen filtre. En filterknapp med tomt panel er verre enn ingen
+  // knapp, så den får de to som faktisk savnes: valuta, og de leverandørene der
+  // kilde-SAD-en ikke lenger kan åpnes for alle fortollingene.
+  const currencies = React.useMemo(
+    () => [...new Set(groups.flatMap((g) => g.currencies).filter(Boolean))].sort(),
+    [groups]
+  );
+  const defs = React.useMemo<FilterDef<SupplierGroup>[]>(() => [
+    {
+      key: 'valuta',
+      label: 'Valuta',
+      fallback: 'alle',
+      options: [
+        { value: 'alle', label: 'Alle valutaer', count: groups.length },
+        ...currencies.map((c) => ({ value: c, label: c, count: groups.filter((g) => g.currencies.includes(c)).length })),
+      ],
+      apply: (list, v) => (v === 'alle' ? list : list.filter((g) => g.currencies.includes(v))),
+    },
+    {
+      key: 'sad',
+      label: 'Kilde-SAD',
+      fallback: 'alle',
+      options: [
+        { value: 'alle', label: 'Alle', count: groups.length },
+        { value: 'mangler', label: 'Mangler kilde-SAD', count: groups.filter((g) => g.sadCount < g.declCount).length },
+      ],
+      apply: (list, v) => (v === 'mangler' ? list.filter((g) => g.sadCount < g.declCount) : list),
+      explain: <>Fortollinger uten kilde-SAD kan ikke åpnes i EMMA, så grunnlaget må hentes en annen vei.</>,
+    },
+  ], [groups, currencies]);
+  const filters = useFilters(defs);
+  const shown = React.useMemo(() => filters.apply(groups), [filters, groups]);
+
   return (
     <>
-      <PageHeader title="Leverandører" blurb={navItemFor('/leverandorer').blurb} />
 
       <StatRow cols={3}>
         <StatCard label="Leverandører" icon={Building2} value={<Num value={groups.length} />}
-          hint={<>Slått sammen på samme leverandøridentitet som Varer bruker, på tvers av {n(data.declarations.length)} fortollinger.</>} />
+          hint={<>På tvers av {n(data.declarations.length)} fortollinger.</>} />
         <StatCard label="Innførselsverdi" icon={Coins} value={<Amount nok={totals.value} />}
           hint="Summert MVA-grunnlag for hele 3-årsvinduet." />
         <StatCard label="Avgifter" icon={Receipt} value={<Amount nok={totals.duty} />}
@@ -95,14 +126,16 @@ export function Suppliers() {
 
       <TableSection
         title="Alle leverandører"
-        description={<>Én rad per leverandør. «+N» betyr at sendingene ikke var like — flere skrivemåter, valutaer eller
-          leveringsvilkår. Utvid raden for hele fortollingshistorikken med lenke til kilde-SAD.</>}
       >
         <DataTable
           columns={cols}
-          data={groups}
+          data={shown}
           initialPageSize={25}
           filterPlaceholder="Søk leverandør…"
+          defs={defs}
+          filters={filters}
+          total={groups.length}
+          unit="leverandører"
           getRowCanExpand={() => true}
           renderSubComponent={(row) => <SupplierDetail g={row.original as SupplierGroup} />}
         />

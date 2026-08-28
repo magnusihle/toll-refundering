@@ -15,11 +15,14 @@ import { n } from '@/lib/format';
  *     itself carries meaning. There is deliberately no colour escape hatch.
  */
 
+/* Tallene bærer mesteparten av denne appen, så de følger landingssidens
+   display-skala: stort, i vekt 500, stram tracking — aldri halvfeitt.
+   `display` er sidens ene helte-tall. */
 export const FIGURE_SIZE = {
-  display: 'text-[2.5rem] leading-[1] font-semibold tracking-tight',
-  lg: 'text-2xl leading-none font-semibold tracking-tight',
-  md: 'text-base leading-none font-semibold',
-  sm: 'text-sm leading-none font-medium',
+  display: 'text-5xl md:text-6xl font-medium tracking-[-0.035em]',
+  lg: 'text-3xl font-medium tracking-[-0.02em]',
+  md: 'text-lg font-medium leading-none',
+  sm: 'text-base font-medium leading-none',
 } as const;
 
 export const FIGURE_TONE = {
@@ -29,7 +32,7 @@ export const FIGURE_TONE = {
   /** Deadline risk, or data that must be corrected. */
   risk: 'text-destructive',
   /** Needs verification before it can be trusted. */
-  caution: 'text-amber-600 dark:text-amber-400',
+  caution: 'text-warning',
   /** Context, denominators, ceilings — present but not the point. */
   muted: 'text-muted-foreground',
 } as const;
@@ -51,12 +54,13 @@ export function Num({ value, tabular, className }: { value: number | null | unde
   return <span className={cn(tabular && 'tabnum', className)}>{n(value)}</span>;
 }
 
+/** Eyebrow-en fra DESIGN.md: 11px, 600, uppercase, tracking 0.14em. */
 export function FieldLabel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <span className={cn('text-[11px] font-medium uppercase tracking-wider text-muted-foreground', className)}>{children}</span>;
+  return <span className={cn('t-eyebrow text-muted-foreground', className)}>{children}</span>;
 }
 
 export function Caption({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn('text-xs leading-snug text-muted-foreground', className)}>{children}</p>;
+  return <p className={cn('t-small text-muted-foreground', className)}>{children}</p>;
 }
 
 /** label → value → hint, at one of the four sizes. The only figure layout in the app. */
@@ -73,8 +77,8 @@ export function Figure({
   return (
     <div className={cn('min-w-0', className)}>
       {label ? <FieldLabel className="block">{label}</FieldLabel> : null}
-      <div className={cn(FIGURE_SIZE[size], FIGURE_TONE[tone], label ? 'mt-2' : undefined)}>{value}</div>
-      {hint ? <Caption className="mt-1.5">{hint}</Caption> : null}
+      <div className={cn(FIGURE_SIZE[size], FIGURE_TONE[tone], 'tabnum', label ? 'mt-2.5' : undefined)}>{value}</div>
+      {hint ? <Caption className="mt-2 max-w-[42ch]">{hint}</Caption> : null}
     </div>
   );
 }

@@ -2,68 +2,183 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Declaro-designsystemet, tilpasset applikasjonen.
+   Kilde: Documents/Declaro/website/DESIGN.md + app/globals.css.
+   Fargene her er merkevaretokens oversatt til HSL-tripler fordi shadcn-laget
+   konsumerer dem som hsl(var(--x)). Ikke finn på nye farger — legg dem i
+   DESIGN.md i dette repoet først. */
 @layer base {
   :root {
-    --background: 210 20% 98%; --foreground: 222.2 47% 11%;
-    --card: 0 0% 100%; --card-foreground: 222.2 47% 11%;
-    --popover: 0 0% 100%; --popover-foreground: 222.2 47% 11%;
-    --primary: 221.2 83% 53%; --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%; --secondary-foreground: 222.2 47% 11%;
-    --muted: 210 40% 96%; --muted-foreground: 215.4 16% 47%;
-    --accent: 210 40% 96%; --accent-foreground: 222.2 47% 11%;
-    --destructive: 0 72% 51%; --destructive-foreground: 210 40% 98%;
-    --success: 142 71% 35%; --success-foreground: 210 40% 98%;
-    --border: 214.3 32% 91%; --input: 214.3 32% 91%; --ring: 221.2 83% 53%;
-    --radius: 0.6rem;
+    /* Varm elfenbenflate, mørk tollgrønn skrift — samme papir som landingssiden. */
+    --background: 42 38.5% 94.9%;                 /* canvas       #F7F4ED */
+    --foreground: 150 20.7% 11.4%;                /* ink          #17231D */
+    --card: 42.9 100% 98.6%;                      /* paper        #FFFDF8 */
+    --card-foreground: 150 20.7% 11.4%;
+    --popover: 42.9 100% 98.6%;
+    --popover-foreground: 150 20.7% 11.4%;
 
-    /* Sidebar surface — one step off the page plane so the content pane reads as the subject. */
-    --sidebar: 222 24% 12%; --sidebar-foreground: 210 30% 92%;
-    --sidebar-accent: 222 20% 20%; --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 222 18% 20%; --sidebar-ring: 217 91% 60%;
+    --primary: 161 49.4% 16.3%;                   /* forest       #153E31 */
+    --primary-foreground: 43.6 44% 95.1%;         /* on-dark      #F8F5ED */
+    --secondary: 120 14.8% 88%;                   /* sage         #DCE5DC */
+    --secondary-foreground: 150 20.7% 11.4%;
+    --muted: 44 31.9% 90.8%;                      /* varm nøytral #EFEBE0 */
+    --muted-foreground: 145 7.1% 33.3%;           /* ink-soft     #4F5B54 */
+    --accent: 120 14.8% 88%;                      /* sage         #DCE5DC */
+    --accent-foreground: 161 49.4% 16.3%;
 
-    /* Chart palette — validated with the dataviz palette validator against the card
-       surface (#ffffff light / #161a22 dark): lightness band, chroma floor, all-pairs
-       CVD separation and normal-vision floor all PASS in both modes. Slot order is the
-       colourblind-safety mechanism — never re-order, never generate a fourth hue.
-       Aqua is sub-3:1 on the light surface, so every chart using it direct-labels. */
-    --chart-1: #2a78d6;   /* blue    — Preferanse / primary series */
-    --chart-2: #eb6834;   /* orange  — RÅK */
-    --chart-3: #1baf7a;   /* aqua    — Produkt */
-    --chart-grid: 214.3 32% 91%;
+    /* Statusfarger. Paletten har ingen egen rød/varsel — disse er utledet i
+       merkevarens varme retning, ikke hentet fra et generisk rødt. De er
+       RESERVERT for tilstand og skal aldri gjenbrukes som serie i et diagram.
+       De opptrer alltid med ikon + tekst, aldri farge alene: destructive ligger
+       hue-messig nær chart-3 (terrakotta), så etiketten er det som skiller dem. */
+    --destructive: 7.8 72.4% 35.5%;               /* #9C2A19 */
+    --destructive-foreground: 43.6 44% 95.1%;
+    --success: 148.6 41.7% 29.6%;                 /* #2C6B4A */
+    --success-foreground: 43.6 44% 95.1%;
+    /* «Til gjennomgang»-tilstanden. Dette ER mineral, merkevarens definerte
+       sjeldne signalaksent, dyphet nok til 4.8:1 som liten tekst på elfenben. */
+    --warning: 39.1 62.4% 33.3%;                  /* #8A6520 */
+    --warning-foreground: 43.6 44% 95.1%;
+
+    /* Trinn, ikke nye farger. Paletten gir én verdi per rolle; en tett app
+       trenger en trapp for nedsenket panel, hover og valgt tilstand. Uten den
+       ender alt som opasitets-triks (secondary/20, /25, /40) som ikke er
+       reproduserbare og som drifter mellom komponenter. */
+    --surface-sunken: 44 31.9% 90.8%;             /* #EFEBE0 varm, ett hakk ned */
+    --secondary-strong: 122 13.4% 80.2%;          /* #C7D4C8 sage, ett hakk opp */
+    --border-strong: 42.4 23.9% 86.1%;            /* #E4DFD3 lys skillelinje */
+
+    --border: 41.2 16.7% 81.2%;                   /* line         #D7D2C7 */
+    --input: 41.2 16.7% 81.2%;
+    --ring: 161 49.4% 16.3%;
+    /* DESIGN.md: applikasjonskontroller 10–14px for tettere flater. */
+    --radius: 0.7rem;
+
+    /* Sidebaren er forest-deep — merkevarefeltet, ikke en kjølig slate-flate.
+       Den bærer mesteparten av merkevaren i appen og lar innholdsflaten være papir. */
+    --sidebar: 161.3 55.2% 11.4%;                 /* forest-deep  #0D2D23 */
+    --sidebar-foreground: 120 14.8% 88%;          /* sage         #DCE5DC */
+    --sidebar-accent: 160.4 50% 18%;              /* #174536 */
+    --sidebar-accent-foreground: 42.9 100% 98.6%;
+    --sidebar-border: 162.7 47.3% 21.6%;          /* #1D5142 */
+    --sidebar-ring: 122.5 10.3% 54.1%;            /* moss         #7E967F */
+
+    /* Diagrampalett — utledet fra merkevarens hue-ankre (grønn H158, bronse H80)
+       pluss ett terrakotta-anker H28, og verifisert med dataviz-validatoren mot
+       kortflaten (#FFFDF8 lys / #16221C mørk): lyshetsbånd, metningsgulv,
+       all-pairs CVD-separasjon, normalsyn-gulv og kontrast består i BEGGE moduser.
+       Lys: verste par ΔE 9.9 (protan) / 19.4 normalsyn. Mørk: 9.3 / 17.0.
+       Merk: tokenverdiene selv (forest/moss/sage) er for lave i metning til å
+       brukes rått — de måler C≈0.04–0.08 mot validatorens gulv på 0.10 og ville
+       lest som grått. Slottrekkefølgen ER fargeblindhets-mekanismen: aldri
+       re-ordne, aldri generer en fjerde hue. */
+    --chart-1: #2c8157;   /* grønn      — Preferanse / primærserie */
+    --chart-2: #bd8708;   /* bronse     — RÅK */
+    --chart-3: #8e2b24;   /* terrakotta — Produkt */
+    --chart-grid: 42.4 23.9% 86.1%;
   }
 
+  /* Mørk modus er EGNE trinn fra de samme ankrene, validert mot den mørke
+     flaten — ikke en automatisk invertering av lys modus. Nøytralene er varme
+     grønnsvarte (forest-deep-familien), aldri de kjølige slate-tonene. */
   .dark {
-    --background: 222 26% 7%; --foreground: 210 40% 96%;
-    --card: 222 22% 11%; --card-foreground: 210 40% 96%;
-    --popover: 222 22% 13%; --popover-foreground: 210 40% 96%;
-    --primary: 217 91% 60%; --primary-foreground: 222 47% 11%;
-    --secondary: 217 19% 20%; --secondary-foreground: 210 40% 96%;
-    --muted: 217 19% 18%; --muted-foreground: 215 20% 65%;
-    --accent: 217 19% 20%; --accent-foreground: 210 40% 96%;
-    --destructive: 0 63% 55%; --destructive-foreground: 210 40% 98%;
-    --success: 142 65% 45%; --success-foreground: 222 47% 11%;
-    --border: 217 19% 22%; --input: 217 19% 22%; --ring: 217 91% 60%;
+    --background: 150 23.8% 8.2%;                 /* #101A15 */
+    --foreground: 42.9 26.9% 89.8%;               /* #ECE8DE */
+    --card: 150 21.4% 11%;                        /* #16221C */
+    --card-foreground: 42.9 26.9% 89.8%;
+    --popover: 152.3 19.4% 13.1%;                 /* #1B2822 */
+    --popover-foreground: 42.9 26.9% 89.8%;
 
-    --sidebar: 222 24% 10%; --sidebar-foreground: 210 30% 90%;
-    --sidebar-accent: 217 19% 20%; --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 217 19% 18%; --sidebar-ring: 217 91% 60%;
+    --primary: 137.8 19.8% 63.3%;                 /* #8FB49A */
+    --primary-foreground: 161.3 55.2% 11.4%;
+    --secondary: 154.3 17.1% 16.1%;               /* #22302A */
+    --secondary-foreground: 42.9 26.9% 89.8%;
+    --muted: 152.3 17.3% 14.7%;                   /* #1F2C26 */
+    --muted-foreground: 140 6.5% 63.9%;           /* #9DA9A1 */
+    --accent: 154.3 17.1% 16.1%;
+    --accent-foreground: 42.9 26.9% 89.8%;
 
-    --chart-1: #3987e5;
-    --chart-2: #d95926;
-    --chart-3: #199e70;
-    --chart-grid: 217 19% 22%;
+    --destructive: 8.9 59.2% 52.9%;               /* #CE5540 */
+    --destructive-foreground: 12 23.8% 8.2%;
+    --success: 137.6 25.2% 54.9%;                 /* #6FA980 */
+    --success-foreground: 161.3 55.2% 11.4%;
+    --warning: 41.6 54% 53.9%;                    /* #C9A24A */
+    --warning-foreground: 161.3 55.2% 11.4%;
+
+    --surface-sunken: 152.3 19.4% 13.1%;          /* #1B2822 */
+    --secondary-strong: 154.1 17.4% 22.5%;        /* #2F433A */
+    --border-strong: 152 15.3% 25.7%;             /* #384B41 */
+
+    --border: 150 13.7% 20%;                      /* #2C3A33 */
+    --input: 150 13.7% 20%;
+    --ring: 137.8 19.8% 63.3%;
+
+    --sidebar: 155 35.3% 6.7%;                    /* #0B1712 */
+    --sidebar-foreground: 102 13.9% 85.9%;        /* #D9E0D6 */
+    --sidebar-accent: 160.7 37.8% 14.5%;          /* #17332A */
+    --sidebar-accent-foreground: 42.9 100% 98.6%;
+    --sidebar-border: 154.7 26% 14.3%;            /* #1B2E26 */
+    --sidebar-ring: 122.5 10.3% 54.1%;
+
+    --chart-1: #34ab72;
+    --chart-2: #bd8708;
+    --chart-3: #964940;   /* kontrast 2.6 mot kortflaten — krever synlig etikett
+                             eller tabellvisning, som Refusjon-siden allerede gir */
+    --chart-grid: 150 13.7% 20%;
   }
 }
 
 @layer base {
   * { @apply border-border; }
   body { @apply bg-background text-foreground; font-feature-settings: "rlig" 1, "calt" 1; }
+
+  /* Systemstacken har ingen vekt mellom Medium (500) og Bold (700), så «litt
+     tykkere» overskrifter løses med en hårfin stroke i tekstfargen i stedet for
+     font-weight 600 (som rendres som full Bold). Samme grep som landingssiden. */
+  h1, h2, h3 { -webkit-text-stroke: 0.007em currentColor; }
+
   /* Recessive scrollbars — chrome should never outweigh the data. */
   * { scrollbar-width: thin; scrollbar-color: hsl(var(--border)) transparent; }
   *::-webkit-scrollbar { width: 10px; height: 10px; }
   *::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 9999px; border: 3px solid transparent; background-clip: content-box; }
   *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); background-clip: content-box; }
+
+  /* Nettleserflatene vi ikke tegnet, men som likevel bærer designet. */
+  ::selection { background: hsl(var(--secondary-strong)); color: hsl(var(--foreground)); }
+  html { color-scheme: light; }
+  .dark { color-scheme: dark; }
+  body { caret-color: hsl(var(--primary)); }
+  /* Understreking som ikke kutter bokstavstammene. */
+  a { text-underline-offset: 0.2em; text-decoration-thickness: from-font; }
+  /* Sifre som skal sammenlignes vertikalt er alltid tabulære — også i input. */
+  input[type='number'], input[inputmode='numeric'] { font-variant-numeric: tabular-nums; }
+  /* Fallback-fokusring. Komponenter som tegner sin egen ring overstyrer denne;
+     alt annet arver en synlig markering i stedet for å miste den helt. */
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; border-radius: 2px; }
 }
 
 /* Columns that must align vertically. Standalone figures keep proportional digits. */
 .tabnum { font-variant-numeric: tabular-nums; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Typografiskalaen. Landingssidens hierarki kommer fra SKALA og LUFT, ikke fra
+   at alt er halvfeitt. Disse klassene er hele skalaen appen har — komponenter
+   plukker fra dem og finner aldri opp en ny text-[..]-verdi.
+   Avledet av DESIGN.md, komprimert ett hakk fordi appen er tettere enn siden.
+   ────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* Sidens ene store overskrift. Vekt 500 + stroken — aldri 600/700. */
+  .t-page    { @apply text-2xl font-medium tracking-[-0.02em] md:text-3xl; }
+  /* Seksjonsoverskrift = DESIGN.md «row heading», vekt 500. */
+  .t-section { @apply text-lg font-medium tracking-[-0.01em]; }
+  .t-lead    { @apply text-lg; }
+  .t-body    { @apply text-base; }
+  .t-small   { @apply text-sm; }
+  /* Eyebrow: kolonnetitler, feltetiketter, sidebargrupper. Aldri over sidetittelen. */
+  .t-eyebrow { @apply text-2xs font-semibold uppercase leading-none tracking-[0.14em]; }
+
+  /* Ledger-streken. Én hårfin linje er all separasjonen appen trenger — den
+     erstatter kort, rammer og skygger som avgrensning. */
+  .rule-t { @apply border-t border-border; }
+  .rule-b { @apply border-b border-border; }
+}

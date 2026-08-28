@@ -18,7 +18,10 @@ export function Layout() {
       <SidebarInset>
         <Header />
         <div ref={main} className="flex-1">
-          <div key={pathname} className="mx-auto w-full max-w-[1500px] animate-fade-in-up space-y-5 p-4 md:p-6">
+          {/* Lesespalten er begrenset per tekstblokk (max-ch), ikke av containeren
+              — datatabellene her er bredere enn en lesespalte, og innhold som
+              faller utenfor kanten er verre enn en bred flate. */}
+          <div key={pathname} className="mx-auto w-full max-w-[1680px] animate-fade-in-up space-y-10 px-6 pb-20 pt-7 md:space-y-12 md:px-10 lg:px-16">
             <Outlet />
           </div>
         </div>

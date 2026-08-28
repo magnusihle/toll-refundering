@@ -17,24 +17,35 @@ import { Declarations } from '@/pages/Declarations';
 import { Suppliers } from '@/pages/Suppliers';
 
 function LoadingScreen() {
+  // Skjelettet må tegne DEN layouten som lastes inn — ellers blinker appen én
+  // struktur og bytter til en annen. Mål her speiler Layout/Header/AppSidebar.
   return (
     <div className="flex min-h-svh">
-      <div className="hidden w-[15.5rem] shrink-0 bg-sidebar p-3 md:block">
-        <Skeleton className="h-9 w-full bg-white/10" />
-        <div className="mt-6 space-y-2">
-          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-8 w-full bg-white/10" />)}
+      <div className="hidden w-[15.5rem] shrink-0 bg-sidebar p-2 md:block">
+        <Skeleton className="h-12 w-full bg-white/[0.07]" />
+        <div className="mt-5 space-y-1.5">
+          {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-9 w-full bg-white/[0.07]" />)}
         </div>
       </div>
       <div className="flex-1">
-        <div className="h-14 border-b" />
-        <div className="mx-auto max-w-[1500px] space-y-5 p-6">
-          <Skeleton className="h-8 w-64" />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 w-full" />)}
+        <div className="h-16 border-b border-border" />
+        <div className="mx-auto max-w-[1280px] space-y-12 px-6 pb-20 pt-9 md:space-y-16 md:px-10 lg:px-16">
+          <div>
+            <Skeleton className="h-9 w-56" />
+            <Skeleton className="mt-4 h-5 w-[32rem] max-w-full" />
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <Skeleton className="h-72 lg:col-span-2" />
-            <Skeleton className="h-72" />
+          <div className="grid gap-y-8 sm:grid-cols-2 xl:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="pl-6">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="mt-3 h-8 w-32" />
+                <Skeleton className="mt-3 h-4 w-40" />
+              </div>
+            ))}
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-6 w-48" />
+            {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
           </div>
         </div>
       </div>
@@ -44,12 +55,12 @@ function LoadingScreen() {
 
 function ErrorScreen({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
-    <div className="grid min-h-svh place-items-center p-6">
-      <div className="max-w-md rounded-xl border bg-card p-6 text-center shadow-sm">
-        <AlertTriangle className="mx-auto size-6 text-destructive" />
-        <h1 className="mt-3 font-semibold">Fikk ikke hentet datagrunnlaget</h1>
-        <p className="mt-1.5 text-sm text-muted-foreground">{error}</p>
-        <Button className="mt-5" onClick={onRetry}><RotateCw />Prøv igjen</Button>
+    <div className="grid min-h-svh place-items-center bg-background px-6 py-12">
+      <div className="w-full max-w-[26rem] rounded-2xl border border-border bg-card p-8 text-center md:p-10">
+        <AlertTriangle className="mx-auto size-6 text-destructive" aria-hidden />
+        <h1 className="mt-4 text-xl font-medium tracking-[-0.015em]">Fikk ikke hentet datagrunnlaget</h1>
+        <p className="mt-2 text-base text-muted-foreground">{error}</p>
+        <Button size="lg" className="mt-7" onClick={onRetry}><RotateCw />Prøv igjen</Button>
       </div>
     </div>
   );
@@ -57,10 +68,12 @@ function ErrorScreen({ error, onRetry }: { error: string; onRetry: () => void })
 
 function NotFound() {
   return (
-    <div className="py-20 text-center">
-      <p className="text-sm uppercase tracking-wider text-muted-foreground">404</p>
-      <h1 className="mt-2 text-xl font-semibold">Denne siden finnes ikke</h1>
-      <Button asChild className="mt-5"><Link to="/">Til dashbordet</Link></Button>
+    <div className="max-w-[46ch] py-16">
+      <h1 className="t-page">Denne siden finnes ikke</h1>
+      <p className="t-lead mt-3 text-muted-foreground">
+        Lenken kan være utdatert. Dashbordet viser hva som er å hente akkurat nå.
+      </p>
+      <Button asChild size="lg" className="mt-7"><Link to="/">Til dashbordet</Link></Button>
     </div>
   );
 }

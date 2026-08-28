@@ -1,13 +1,19 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
 
 /**
- * The only card layout pages are allowed to use.
+ * En seksjon er ÅPEN, ikke et kort.
  *
- * Every section on every page gets the same padding, the same title size and the
- * same action slot, so the page rhythm is a property of the system rather than
- * something each page re-invents.
+ * Landingssiden bruker «open sections and ruled rows over grids of generic
+ * cards» (DESIGN.md), og Magnus fjernet dessuten hairline-topplinjene mellom
+ * stegene med begrunnelsen at overskrift og luft skal skape strukturen, ikke
+ * streker i en prosess-tabell. Seksjoner separeres derfor av AVSTAND alene.
+ *
+ * Ledger-strekene er ikke borte — de hører hjemme der data faktisk står i
+ * kolonner: i tabellen, i control-margin mellom nøkkeltall, og over en fotnote.
+ *
+ * Avstanden MELLOM seksjoner eies av Layout (`space-y`), ikke av seksjonen selv,
+ * slik at et bart element på en side får nøyaktig samme rytme som en seksjon.
  */
 export function Section({
   title, description, action, children, className, bodyClassName, footer,
@@ -21,23 +27,25 @@ export function Section({
   footer?: React.ReactNode;
 }) {
   return (
-    <Card className={cn('overflow-hidden', className)}>
+    <section className={className}>
       {(title || action) && (
-        <div className="flex flex-col gap-3 px-5 pb-4 pt-5 md:flex-row md:items-start md:justify-between md:gap-6">
-          <div className="min-w-0 md:max-w-3xl">
-            {title ? <h2 className="text-sm font-semibold leading-none tracking-tight">{title}</h2> : null}
-            {description ? <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{description}</p> : null}
+        <div className="flex flex-col gap-3 md:flex-row md:items-baseline md:justify-between md:gap-8">
+          <div className="min-w-0 md:max-w-[78ch]">
+            {title ? <h2 className="t-section">{title}</h2> : null}
+            {description ? <p className="mt-1.5 text-sm text-muted-foreground">{description}</p> : null}
           </div>
           {action ? <div className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">{action}</div> : null}
         </div>
       )}
-      <div className={cn('px-5 pb-5', !title && !action && 'pt-5', bodyClassName)}>{children}</div>
-      {footer ? <div className="border-t bg-muted/30 px-5 py-3 text-xs text-muted-foreground">{footer}</div> : null}
-    </Card>
+      <div className={cn(title || action ? 'mt-5' : undefined, bodyClassName)}>{children}</div>
+      {footer ? (
+        <div className="t-small mt-7 border-t border-border-strong pt-3.5 text-muted-foreground">{footer}</div>
+      ) : null}
+    </section>
   );
 }
 
-/** A section whose body is a table: the table supplies its own edge padding. */
+/** Beholdt for kall-kompatibilitet — en tabellseksjon er nå bare en seksjon. */
 export function TableSection(props: React.ComponentProps<typeof Section>) {
-  return <Section {...props} bodyClassName={cn('px-5 pb-5', props.bodyClassName)} />;
+  return <Section {...props} />;
 }

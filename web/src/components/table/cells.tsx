@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Amount, Num } from '@/components/ui/metric';
 import { cn } from '@/lib/utils';
@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
  *
  * Goods set the pattern — one row per real-world entity, consolidated across
  * shipments, expandable to the declarations behind it — and these are the pieces
- * that pattern is made of. Gjenvinning, Deklarasjoner and Leverandører render
+ * that pattern is made of. Refusjon, Deklarasjoner and Leverandører render
  * their columns from exactly these, so a number, a code or a "+2 more" marker
  * looks and behaves the same wherever it appears.
  */
@@ -19,7 +19,17 @@ export const expandColumn = <T,>() => ({
   id: 'exp',
   header: '',
   cell: ({ row }: any) => (
-    <ChevronRight className={cn('size-4 text-muted-foreground transition-transform', row.getIsExpanded() && 'rotate-90')} />
+    // Raden kan klikkes med mus, men affordansen må også kunne nås med tastatur.
+    // Knappen bærer semantikken; radklikket er bare en bekvemmelighet.
+    <button
+      type="button"
+      aria-expanded={row.getIsExpanded()}
+      aria-label={row.getIsExpanded() ? 'Skjul detaljer' : 'Vis detaljer'}
+      onClick={(e) => { e.stopPropagation(); row.toggleExpanded(); }}
+      className="grid size-6 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    >
+      <ChevronRight className={cn('size-4 transition-transform duration-200', row.getIsExpanded() && 'rotate-90')} />
+    </button>
   ),
 });
 
@@ -28,7 +38,7 @@ export function Primary({ children, title, width = 'max-w-[22ch]', extra }: { ch
   return (
     <span className="flex items-baseline gap-1">
       <span className={cn('truncate font-medium', width)} title={title ?? (typeof children === 'string' ? children : undefined)}>{children || '—'}</span>
-      {extra ? <span className="shrink-0 text-xs font-medium text-amber-600 dark:text-amber-400">+{extra}</span> : null}
+      {extra ? <span className="shrink-0 text-xs font-medium text-warning">+{extra}</span> : null}
     </span>
   );
 }
@@ -70,7 +80,7 @@ export function MultiValue({ values, render }: { values: any[]; render?: (v: any
   return (
     <span className="whitespace-nowrap">
       {render ? render(first) : first}
-      {rest.length ? <span className="ml-1 text-xs font-medium text-amber-600 dark:text-amber-400">+{rest.length}</span> : null}
+      {rest.length ? <span className="ml-1 text-xs font-medium text-warning">+{rest.length}</span> : null}
     </span>
   );
 }
@@ -95,6 +105,31 @@ export function Tag({ children, variant = 'secondary' }: { children: React.React
   return <Badge variant={variant}>{children}</Badge>;
 }
 
+/**
+ * Kravtypen er en KATEGORI, ikke en tilstand.
+ *
+ * Den ble tidligere malt med statusvariantene (RÅK = success, Produkt = warning),
+ * som både bryter DESIGN.md sin regel om at statusfarger er reservert, og lot
+ * samme grønt bety «RÅK» i én kolonne og «sterk match» i nabokolonnen. Typene har
+ * allerede en egen identitetsfarge — den fra diagrampaletten — så badgen bruker
+ * den, og en søyle i diagrammet og en rad i tabellen får samme farge for samme type.
+ */
+export const KIND_COLOR: Record<string, string> = {
+  Preferanse: 'var(--chart-1)',
+  'RÅK': 'var(--chart-2)',
+  Produkt: 'var(--chart-3)',
+};
+
+export function KindBadge({ kind }: { kind: string }) {
+  const color = KIND_COLOR[kind];
+  return (
+    <Badge variant="secondary">
+      {color ? <span aria-hidden className="size-1.5 shrink-0 rounded-xxs" style={{ background: color }} /> : null}
+      {kind}
+    </Badge>
+  );
+}
+
 /** Opens the source SAD in a new tab without toggling the row's expansion. */
 export function SadLink({ url }: { url?: string | null }) {
   if (!url) return <span className="text-muted-foreground">—</span>;
@@ -104,9 +139,10 @@ export function SadLink({ url }: { url?: string | null }) {
       target="_blank"
       rel="noopener"
       onClick={(e) => e.stopPropagation()}
-      className="whitespace-nowrap text-primary hover:underline"
+      className="inline-flex items-center gap-1 whitespace-nowrap rounded-sm text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      SAD ↗
+      SAD<ExternalLink className="size-3.5" aria-hidden />
+      <span className="sr-only">(åpnes i ny fane)</span>
     </a>
   );
 }

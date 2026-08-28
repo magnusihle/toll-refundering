@@ -7,6 +7,7 @@ import { fetchSads, cleanupSads } from './modules/sad-fetch.js';
 import { upsertDeclaration, summary, existingTollnummers } from './db.js';
 import { parseNoNumber, parseNoDate } from './util.js';
 import { claimWindow } from './period.js';
+import { normalizeProductText } from './identity.js';
 
 const TSX = path.join(ROOT, 'node_modules', '.bin', 'tsx');
 const CONVERT = path.join(ROOT, 'src', 'sad', 'convert.ts');
@@ -35,10 +36,12 @@ function lineDesc(box31) {
   if (typeof box31 === 'string') return box31;
   return box31.description || box31.marks || null;
 }
-const normKey = (s) => (s || '').toLowerCase().replace(/[^a-z0-9æøå ]/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
 export function productKey({ article_number, description }) {
   if (article_number && String(article_number).trim()) return 'art:' + String(article_number).trim();
-  if (description) return 'desc:' + normKey(description);
+  if (description) {
+    const norm = normalizeProductText(description);
+    return norm ? 'desc:' + norm.slice(0, 60) : null;
+  }
   return null;
 }
 

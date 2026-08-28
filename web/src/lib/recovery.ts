@@ -76,7 +76,7 @@ export type ClaimGroup = {
   assessed: number;
   tollnummers: string[];
   /** Felt som er identiske for hele gruppen, og derfor kan løftes ut av radlisten. */
-  shared: { action?: string; reasoning?: string; claim_draft?: string; likelihood?: string; bku?: any };
+  shared: { summary?: string; action?: string; reasoning?: string; claim_draft?: string; likelihood?: string; bku?: any };
   _flag: boolean;
 };
 
@@ -115,6 +115,9 @@ export function groupClaims(rows: any[]): ClaimGroup[] {
       assessed: claims.filter((r) => r.likelihood).length,
       tollnummers: uniq(claims.map((r) => r.tollnummer).filter(Boolean)),
       shared: {
+        // Er sammendraget likt for alle fortollingene i gruppen, hører det hjemme
+        // ÉN gang over tabellen. Er det ikke likt, står det per rad i tabellen.
+        summary: sharedVal(claims, 'summary'),
         action: sharedVal(claims, 'action'),
         reasoning: sharedVal(claims, 'reasoning'),
         claim_draft: sharedVal(claims, 'claim_draft'),

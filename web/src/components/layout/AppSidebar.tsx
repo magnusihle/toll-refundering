@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Ship, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
   SidebarHeader, SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, SidebarSeparator, useSidebar,
@@ -41,13 +41,15 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">
       <SidebarHeader>
-        <div className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5">
-          <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
-            <Ship className="size-4" />
+        <div className="flex items-center gap-2.5 px-1.5 py-2.5">
+          {/* Ordmerket, ikke et oppfunnet symbol (DESIGN.md). Sammentrukket
+              sidebar faller tilbake til forbokstaven. */}
+          <div className="grid size-8 shrink-0 place-items-center rounded-md border border-sidebar-border text-base font-medium text-sidebar-foreground group-data-[collapsible=icon]:border-transparent">
+            D
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="truncate text-sm font-semibold leading-tight">EMMA EDOC</div>
-            <div className="truncate text-[11px] leading-tight text-sidebar-foreground/60">Arnika AS · fortolling</div>
+            <div className="truncate text-lg font-medium leading-tight tracking-[-0.02em]">Declaro.</div>
+            <div className="truncate text-2xs leading-tight text-sidebar-foreground/55">Arnika AS · fortolling</div>
           </div>
         </div>
       </SidebarHeader>
@@ -57,7 +59,9 @@ export function AppSidebar() {
       <SidebarContent>
         {GROUPS.map((group) => (
           <SidebarGroup key={group}>
-            <SidebarGroupLabel>{group}</SidebarGroupLabel>
+            <SidebarGroupLabel className="t-eyebrow h-auto px-2 pb-1.5 pt-4 text-sidebar-foreground/45">
+              {group}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {NAV.filter((item) => item.group === group).map((item) => {
@@ -65,15 +69,24 @@ export function AppSidebar() {
                   const active = isActive(item.to);
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        tooltip={item.label}
+                        className={
+                          'h-9 rounded-md text-base font-normal ' +
+                          'data-[active=true]:font-medium ' +
+                          'data-[active=true]:[&>svg]:text-sidebar-accent-foreground'
+                        }
+                      >
                         <NavLink to={item.to} onClick={close}>
                           <item.icon />
                           <span>{item.label}</span>
                         </NavLink>
                       </SidebarMenuButton>
                       {c?.urgent ? (
-                        <SidebarMenuBadge className="text-destructive">
-                          <AlertTriangle className="mr-0.5 size-3" />{c.urgent}
+                        <SidebarMenuBadge className="gap-1 text-destructive">
+                          <AlertTriangle className="size-3" />{c.urgent}
                         </SidebarMenuBadge>
                       ) : c?.text ? (
                         <SidebarMenuBadge>{c.text}</SidebarMenuBadge>
@@ -88,8 +101,8 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
-        <div className="rounded-lg bg-sidebar-accent/50 px-3 py-2 text-[11px] leading-relaxed text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden">
-          <div className="font-medium text-sidebar-foreground/90">3-årsvindu</div>
+        <div className="border-t border-sidebar-border px-2 pb-1 pt-3 text-2xs leading-relaxed text-sidebar-foreground/60 group-data-[collapsible=icon]:hidden">
+          <div className="t-eyebrow mb-1.5 text-sidebar-foreground/45">3-årsvindu</div>
           <div className="tabnum">{win?.from} – {win?.to}</div>
           <div>Frist regnes fra i dag ({win?.tz})</div>
         </div>

@@ -265,7 +265,7 @@ const SidebarGroupLabel = React.forwardRef<HTMLDivElement, React.ComponentProps<
         ref={ref}
         data-sidebar="group-label"
         className={cn(
-          'flex h-8 shrink-0 items-center rounded-md px-2 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/60 outline-none transition-[margin,opacity] duration-200 ease-linear',
+          'flex h-8 shrink-0 items-center rounded-md px-2 text-2xs font-medium uppercase tracking-wider text-sidebar-foreground/60 outline-none transition-[margin,opacity] duration-200 ease-linear',
           'group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0',
           className
         )}
@@ -344,7 +344,7 @@ const SidebarMenuBadge = React.forwardRef<HTMLDivElement, React.ComponentProps<'
     ref={ref}
     data-sidebar="menu-badge"
     className={cn(
-      'pointer-events-none absolute right-1.5 flex h-5 min-w-5 select-none items-center justify-center rounded-md px-1 text-[11px] font-medium tabular-nums text-sidebar-foreground/70',
+      'pointer-events-none absolute right-1.5 flex h-5 min-w-5 select-none items-center justify-center rounded-md px-1 text-2xs font-medium tabular-nums text-sidebar-foreground/70',
       'peer-data-[size=default]/menu-button:top-2 peer-data-[size=sm]/menu-button:top-1 peer-data-[size=lg]/menu-button:top-3.5',
       'group-data-[collapsible=icon]:hidden',
       className
